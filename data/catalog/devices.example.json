@@ -1,0 +1,15 @@
+[
+  {
+    "id": "example_device",
+    "name": "Example Device",
+    "brand": "Example Brand",
+    "model": "MODEL-123",
+    "room": "kitchen",
+    "category": "appliance",
+    "manual_files": [
+      "example_reference.md"
+    ]
+  }
+]
+
+

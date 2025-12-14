@@ -1,0 +1,120 @@
+.edit-modal-content {
+  background: radial-gradient(circle at top, #0f172a 0, #020617 55%, #020617 100%);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9);
+  width: 100%;
+  max-width: 500px;
+  animation: slideUp 0.3s ease-out;
+}
+
+.edit-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 28px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.edit-modal-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #e5e7eb;
+}
+
+.edit-modal-body {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edit-field label {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.edit-field input {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: #020617;
+  color: #e5e7eb;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.edit-field input:focus {
+  outline: none;
+  border-color: #06b6d4;
+}
+
+.edit-field input::placeholder {
+  color: #6b7280;
+}
+
+.edit-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 28px 24px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.edit-button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.edit-button.primary {
+  background: linear-gradient(to right, #4f46e5, #06b6d4);
+  color: white;
+}
+
+.edit-button.primary:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4);
+}
+
+.edit-button.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.edit-button.secondary {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #9ca3af;
+}
+
+.edit-button.secondary:not(:disabled):hover {
+  border-color: #9ca3af;
+  color: #e5e7eb;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+@media (max-width: 768px) {
+  .edit-modal-content {
+    max-width: 100%;
+    border-radius: 0;
+  }
+
+  .edit-modal-body {
+    max-height: 70vh;
+  }
+}
+
