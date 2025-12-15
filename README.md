@@ -27,6 +27,8 @@ Features automatic language detection, selective extraction (60-70% time savings
 ### 2. One-time setup
 
 #### Backend environment
+**Windows (PowerShell)**
+
 ```powershell
 cd backend
 python -m venv .venv
@@ -35,8 +37,28 @@ pip install -r requirements.txt
 cd ..
 ```
 
+**macOS/Linux (bash/zsh)**
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cd ..
+```
+
 #### Frontend dependencies
+**Windows (PowerShell)**
+
 ```powershell
+cd frontend
+npm install
+cd ..
+```
+
+**macOS/Linux (bash/zsh)**
+
+```bash
 cd frontend
 npm install
 cd ..
@@ -55,6 +77,8 @@ No manual setup required! Use the UI to upload manuals via the wizard.
 ### 3. Daily run
 
 **Quick start (recommended):**
+
+**Windows**
 ```powershell
 # PowerShell
 .\start-services.ps1
@@ -63,7 +87,14 @@ No manual setup required! Use the UI to upload manuals via the wizard.
 start-services.bat
 ```
 
-This will automatically start all three services (Ollama, Backend, Frontend) in separate windows.
+**macOS/Linux**
+
+```bash
+chmod +x ./start-services.sh
+./start-services.sh
+```
+
+This will automatically start all three services (Ollama, Backend, Frontend). On Windows it opens separate terminals; on macOS/Linux it runs everything from your current terminal (Ctrl+C to stop).
 
 #### Frontend API base URL (optional)
 
@@ -77,15 +108,37 @@ VITE_API_BASE_URL=http://localhost:8000
 
 **Manual start (alternative):**
 1. **Start the backend API**
+
+   **Windows (PowerShell)**
+
    ```powershell
    backend\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
    ```
+
+   **macOS/Linux (bash/zsh)**
+
+   ```bash
+   cd backend
+   . .venv/bin/activate
+   python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+   ```
+
 2. **Start the frontend dev server**
-   ```powershell
+
+   ```bash
    cd frontend
    npm run dev
    ```
 3. Browse to `http://localhost:5173` (backend listens on `http://localhost:8000`).
+
+---
+
+### 3.1 Notes for macOS/Linux
+
+- If `pip install -r backend/requirements.txt` fails on `reportlab`, you can install system deps first:
+  - **macOS (Homebrew)**: `brew install freetype libjpeg`
+  - **Debian/Ubuntu**: `sudo apt-get install -y libfreetype6-dev libjpeg-dev zlib1g-dev`
+  - Or remove `reportlab` from `backend/requirements.txt` (it’s treated as optional at runtime).
 
 ---
 
