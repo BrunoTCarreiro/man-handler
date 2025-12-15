@@ -10,6 +10,7 @@ This version cleans each chunk before embedding to remove:
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import List
 import ollama
@@ -22,6 +23,8 @@ from langchain.schema import Document
 
 from . import settings
 from .device_catalog import Device, load_devices
+
+logger = logging.getLogger("backend.ingest_enhanced")
 
 
 CHUNK_CLEANING_PROMPT = """You are a text cleaning assistant. Your job is to take a raw chunk of text from a manual and clean it for semantic search.
@@ -82,7 +85,7 @@ def clean_chunk_with_llm(chunk_text: str, model: str = "mistral:instruct") -> st
         return cleaned
         
     except Exception as e:
-        print(f"  ⚠️  Error cleaning chunk: {e}")
+        logger.warning("Error cleaning chunk: %s", e)
         # Fall back to original text if cleaning fails
         return chunk_text
 
@@ -98,15 +101,14 @@ def clean_chunks(chunks: List[Document], model: str = "mistral:instruct") -> Lis
     Returns:
         List of Documents with cleaned text (empty content chunks are removed)
     """
-    print(f"\n🧹 Cleaning {len(chunks)} chunks with {model}...")
-    print("This may take a few minutes...\n")
+    logger.info("Cleaning %d chunks with %s...", len(chunks), model)
     
     cleaned_chunks = []
     skipped = 0
     
     for i, chunk in enumerate(chunks, 1):
         if i % 10 == 0:
-            print(f"  Progress: {i}/{len(chunks)} chunks processed ({skipped} skipped)")
+            logger.debug("Progress: %d/%d chunks processed (%d skipped)", i, len(chunks), skipped)
         
         original_text = chunk.page_content
         cleaned_text = clean_chunk_with_llm(original_text, model)
@@ -122,10 +124,8 @@ def clean_chunks(chunks: List[Document], model: str = "mistral:instruct") -> Lis
         )
         cleaned_chunks.append(cleaned_chunk)
     
-    print(f"\n✓ Cleaning complete!")
-    print(f"  Original chunks: {len(chunks)}")
-    print(f"  Cleaned chunks: {len(cleaned_chunks)}")
-    print(f"  Skipped (no content): {skipped}\n")
+    logger.info("Cleaning complete! Original: %d, Cleaned: %d, Skipped: %d",
+                len(chunks), len(cleaned_chunks), skipped)
     
     return cleaned_chunks
 
@@ -183,13 +183,13 @@ def build_vectorstore(clean_chunks_with_llm: bool = True, model: str = "mistral:
     """
     documents = list(load_manuals_with_metadata())
     if not documents:
-        print("No manuals found; skipping vector store build.")
+        logger.info("No manuals found; skipping vector store build.")
         return
 
-    print(f"Loaded {len(documents)} pages from manuals")
+    logger.info("Loaded %d pages from manuals", len(documents))
     
     chunks = _split_documents(documents)
-    print(f"Split into {len(chunks)} chunks")
+    logger.info("Split into %d chunks", len(chunks))
     
     # NEW: Clean chunks with LLM if enabled
     if clean_chunks_with_llm:
@@ -197,13 +197,13 @@ def build_vectorstore(clean_chunks_with_llm: bool = True, model: str = "mistral:
     
     embeddings = OllamaEmbeddings(model=settings.EMBED_MODEL_NAME)
 
-    print(f"Embedding and storing {len(chunks)} chunks...")
+    logger.info("Embedding and storing %d chunks...", len(chunks))
     Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
         persist_directory=str(settings.VECTORDB_DIR),
     )
-    print(f"✅ Vector store built at {settings.VECTORDB_DIR}")
+    logger.info("Vector store built at %s", settings.VECTORDB_DIR)
 
 
 def add_device_manuals(device_id: str, clean_chunks_with_llm: bool = True, model: str = "mistral:instruct") -> None:
@@ -223,7 +223,7 @@ def add_device_manuals(device_id: str, clean_chunks_with_llm: bool = True, model
 
     documents = list(_load_manual_files_for_device(device))
     if not documents:
-        print(f"No manuals found for device {device_id}")
+        logger.info("No manuals found for device %s", device_id)
         return
 
     chunks = _split_documents(documents)
@@ -239,14 +239,11 @@ def add_device_manuals(device_id: str, clean_chunks_with_llm: bool = True, model
         embedding_function=embeddings,
     )
     store.add_documents(chunks)
-    store.persist()
-    print(f"✅ Added manuals for device {device_id} to vector store.")
+    # Note: ChromaDB auto-persists in v0.4+, no need to call persist()
+    logger.info("Added manuals for device %s to vector store.", device_id)
 
 
 if __name__ == "__main__":
     # Build with chunk cleaning enabled
     # This will take longer but produce much cleaner embeddings
     build_vectorstore(clean_chunks_with_llm=True, model="mistral:instruct")
-
-
-

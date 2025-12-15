@@ -96,11 +96,36 @@ chmod +x ./start-services.sh
 
 This will automatically start all three services (Ollama, Backend, Frontend). On Windows it opens separate terminals; on macOS/Linux it runs everything from your current terminal (Ctrl+C to stop).
 
-#### Frontend API base URL (optional)
+#### Environment Variables
 
-By default the frontend calls the backend at `http://localhost:8000`.
+##### Backend Configuration
 
-To override (for example, running backend on a different port), create `frontend/.env.local`:
+Create a `backend/.env` file (see `backend/env.example`):
+
+```bash
+# Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+LOG_LEVEL=INFO
+
+# CORS: Comma-separated list of allowed origins
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+
+# Ollama Model Configuration
+EMBED_MODEL=bge-m3
+LLM_MODEL=mistral:instruct
+TRANSLATION_MODEL=mistral:instruct
+
+# RAG Retrieval Parameters
+TOP_K=5
+RELEVANCE_THRESHOLD=0.3
+
+# Text Chunking Configuration
+CHUNK_SIZE=800
+CHUNK_OVERLAP=200
+```
+
+##### Frontend Configuration
+
+Create `frontend/.env.local`:
 
 ```bash
 VITE_API_BASE_URL=http://localhost:8000
@@ -120,7 +145,6 @@ VITE_API_BASE_URL=http://localhost:8000
    ```bash
    cd backend
    . .venv/bin/activate
-   cd ..
    python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
    ```
 

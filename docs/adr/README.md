@@ -23,6 +23,7 @@ An ADR is a document that captures an important architectural decision made alon
 | [010](010-markdown-first-ingestion.md) | Markdown-First Ingestion Strategy | Accepted | 2025-12-13 |
 | [011](011-settings-panel-device-management.md) | Settings Panel and Device Management | Accepted | 2025-12-14 |
 | [012](012-device-actions-consolidation.md) | Device Actions Consolidation and View Manual Feature | Accepted | 2025-12-14 |
+| [013](013-code-quality-and-configuration.md) | Code Quality Infrastructure and Centralized Configuration | Accepted | 2025-12-15 |
 
 ## Decision Status
 
@@ -62,6 +63,9 @@ When making significant architectural decisions:
   ├─ ADR-010: Markdown-first ingestion strategy
   ├─ ADR-011: Settings panel and device management
   └─ ADR-012: Actions dropdown and view manual feature
+
+2025-12-15: Code Quality & Configuration
+  └─ ADR-013: Code quality infrastructure and centralized config
 ```
 
 ## Related Documentation

@@ -43,7 +43,6 @@ export function ManualOnboardingModal({
   const [analyzeStatus, setAnalyzeStatus] = useState<string | null>(null);
   const [commitStatus, setCommitStatus] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processAbort, setProcessAbort] = useState<AbortController | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const pollingIntervalRef = useRef<number | null>(null);
@@ -74,7 +73,6 @@ export function ManualOnboardingModal({
     setManualMetadata(emptyMetadata);
     setAnalyzeStatus(null);
     setCommitStatus(null);
-    setProcessAbort(null);
     setIsProcessing(false);
     setIsAnalyzing(false);
     setIsCommitting(false);
@@ -118,11 +116,14 @@ export function ManualOnboardingModal({
   // (Auto-scroll handled above; keep single effect to avoid duplicate work.)
 
   // Auto-start analysis when entering step 3
+  // Intentionally only triggers on step change to avoid re-running on every render
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (currentStep === "analysis" && processResult && !analyzeResult && !isAnalyzing) {
       handleAnalyze();
     }
   }, [currentStep]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Reset wizard when modal opens (clean state)
   useEffect(() => {

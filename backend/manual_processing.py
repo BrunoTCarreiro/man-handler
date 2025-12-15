@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import shutil
 import uuid
@@ -22,6 +23,8 @@ except Exception:  # pragma: no cover - optional dependency at runtime
     _HAS_REPORTLAB = False
 
 from . import settings
+
+logger = logging.getLogger("backend.manual_processing")
 
 TEMP_UPLOADS_DIR = settings.DATA_DIR / "_uploads"
 
@@ -291,10 +294,10 @@ Respond ONLY with a JSON object in this exact format (no prose, no code fences).
             extracted = _parse_json_response(response_text)
             break
         except Exception as e:
-            print(f"LLM analysis attempt failed: {e}")
+            logger.warning("LLM analysis attempt failed: %s", e)
 
     if not extracted:
-        print("LLM analysis failed twice; falling back to filename-based suggestion")
+        logger.warning("LLM analysis failed twice; falling back to filename-based suggestion")
         return suggest_device_metadata(meta["stored_filename"])
 
     # Heuristic room inference if missing
@@ -393,7 +396,7 @@ Translation:"""
         translated = response.content if hasattr(response, 'content') else str(response)
         return translated.strip()
     except Exception as e:
-        print(f"Translation failed for chunk: {e}")
+        logger.warning("Translation failed for chunk: %s", e)
         return text  # Return original if translation fails
 
 
@@ -417,13 +420,13 @@ def translate_manual_to_english(token: str) -> Dict:
     first_page_text = reader.pages[0].extract_text() or ""
     detected_lang = _detect_language(first_page_text)
     
-    print(f"Detected language: {detected_lang}")
+    logger.info("Detected language: %s", detected_lang)
     
     # Extract and translate text from all pages
     translated_pages = []
     
     for idx, page in enumerate(reader.pages, start=1):
-        print(f"Translating page {idx}/{total_pages}...")
+        logger.debug("Translating page %d/%d...", idx, total_pages)
         
         text = page.extract_text() or ""
         if len(text.strip()) < 50:

@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -29,6 +30,25 @@ cancellation_flags: Dict[str, bool] = {}
 
 # Lock for thread-safe access to processing_status
 status_lock = threading.Lock()
+
+# TTL for processing status entries (1 hour in seconds)
+STATUS_TTL_SECONDS = 3600
+
+
+def cleanup_expired_statuses() -> None:
+    """Remove processing status entries older than TTL."""
+    current_time = time.time()
+    with status_lock:
+        expired_tokens = [
+            token for token, status in processing_status.items()
+            if current_time - status.get("created_at", 0) > STATUS_TTL_SECONDS
+        ]
+        for token in expired_tokens:
+            del processing_status[token]
+            if token in cancellation_flags:
+                del cancellation_flags[token]
+        if expired_tokens:
+            logger.info("Cleaned up %d expired processing status entries", len(expired_tokens))
 
 
 class ChatRequest(BaseModel):
@@ -111,14 +131,14 @@ app = FastAPI(title="Home Manual Assistant")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-    ],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Get logger from settings
+logger = settings.logger
 
 
 @app.get("/health")
@@ -397,6 +417,7 @@ async def process_manual(
             "status": "processing",
             "logs": ["[INFO] Upload received, starting processing..."],
             "stage": "starting",
+            "created_at": time.time(),
         }
         cancellation_flags[token] = False
 
@@ -427,6 +448,9 @@ def get_processing_status(token: str):
     Returns real-time logs and status during processing, enabling
     the frontend to poll for progress updates.
     """
+    # Periodically cleanup expired entries
+    cleanup_expired_statuses()
+    
     if token not in processing_status:
         # Return a default "not found" status instead of 404 to avoid breaking the UI
         return {
@@ -544,19 +568,19 @@ def delete_device(device_id: str) -> dict:
     try:
         remove_device_from_vectorstore(device_id)
     except Exception as exc:
-        print(f"[WARN] Failed to remove from vector store: {exc}")
+        logger.warning("Failed to remove from vector store: %s", exc)
     
     # Remove device directory with all files
     device_dir = settings.MANUALS_DIR / device_id
     if device_dir.exists():
         shutil.rmtree(device_dir, ignore_errors=True)
-        print(f"[OK] Removed device directory: {device_dir}")
+        logger.info("Removed device directory: %s", device_dir)
     
     # Remove from devices.json
     devices = [d for d in devices if d.id != device_id]
     save_devices(devices)
     
-    print(f"[OK] Deleted device '{device_id}' successfully")
+    logger.info("Deleted device '%s' successfully", device_id)
     return {"status": "ok", "message": f"Device '{device_id}' deleted successfully"}
 
 
@@ -604,7 +628,7 @@ def update_device(device_id: str, request: DeviceUpdateRequest) -> Device:
     # Save updated devices list
     save_devices(devices)
     
-    print(f"[OK] Updated device '{device_id}' metadata")
+    logger.info("Updated device '%s' metadata", device_id)
     return device
 
 
@@ -632,7 +656,7 @@ def rename_room(request: RenameRoomRequest) -> dict:
     # Save updated devices list
     save_devices(devices)
     
-    print(f"[OK] Renamed room '{request.old_room}' to '{request.new_room}' ({updated_count} devices updated)")
+    logger.info("Renamed room '%s' to '%s' (%d devices updated)", request.old_room, request.new_room, updated_count)
     return {
         "status": "ok",
         "message": f"Room renamed successfully",
@@ -665,7 +689,7 @@ def get_device_markdown(device_id: str) -> str:
     
     try:
         content = md_file.read_text(encoding="utf-8")
-        print(f"[INFO] Serving markdown for device '{device_id}': {md_file.name}")
+        logger.debug("Serving markdown for device '%s': %s", device_id, md_file.name)
         return content
     except Exception as exc:
         raise HTTPException(
@@ -700,7 +724,7 @@ def get_device_file(device_id: str, file_path: str):
     if not full_path.exists() or not full_path.is_file():
         raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
     
-    print(f"[INFO] Serving file for device '{device_id}': {file_path}")
+    logger.debug("Serving file for device '%s': %s", device_id, file_path)
     return FileResponse(full_path)
 
 

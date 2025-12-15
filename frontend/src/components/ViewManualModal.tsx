@@ -96,7 +96,7 @@ export function ViewManualModal({ isOpen, device, onClose }: ViewManualModalProp
                 <ReactMarkdown
                   rehypePlugins={[rehypeRaw]}
                   components={{
-                    img: ({node, ...props}) => (
+                    img: ({node: _node, ...props}) => (
                       <img
                         {...props}
                         src={

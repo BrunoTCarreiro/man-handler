@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import List
 
@@ -9,6 +10,8 @@ from langchain_community.vectorstores import Chroma
 from langchain_ollama import OllamaEmbeddings
 
 from . import settings
+
+logger = logging.getLogger("backend.ingest")
 from .device_catalog import Device, load_devices
 from .ocr_extraction import extract_pdf_with_ocr
 
@@ -26,21 +29,21 @@ def _load_manual_files_for_device(device: Device):
     
     if markdown_files:
         # Use processed markdown files (preferred)
-        print(f"\n[INFO] Using markdown reference files for {device.id}")
+        logger.info("Using markdown reference files for %s", device.id)
         for file_name in markdown_files:
             path = device_dir / file_name
             if not path.exists():
-                print(f"  Warning: File not found: {path}")
+                logger.warning("Markdown file not found: %s", path)
                 continue
             
-            print(f"  Processing: {file_name}")
+            logger.debug("Processing: %s", file_name)
             
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     content = f.read()
                 
                 if not content.strip():
-                    print(f"  Warning: Empty markdown file: {file_name}")
+                    logger.warning("Empty markdown file: %s", file_name)
                     continue
                 
                 # Create a single document from the entire markdown
@@ -58,39 +61,39 @@ def _load_manual_files_for_device(device: Device):
                         "source_type": "markdown_reference",
                     }
                 )
-                print(f"  [OK] Loaded markdown ({len(content)} chars)")
+                logger.debug("Loaded markdown (%d chars)", len(content))
                 yield doc
                 
             except Exception as e:
-                print(f"  Warning: Failed to read markdown {file_name}: {e}")
+                logger.warning("Failed to read markdown %s: %s", file_name, e)
                 continue
     
     else:
         # No markdown files - fall back to extracting PDFs
         # (This handles legacy manuals or manually added PDFs)
-        print(f"\n[INFO] No markdown references found, extracting PDFs for {device.id}")
+        logger.info("No markdown references found, extracting PDFs for %s", device.id)
         images_dir = device_dir / "images"
         
         for file_name in device.manual_files:
             path = device_dir / file_name
             if not path.exists():
-                print(f"  Warning: File not found: {path}")
+                logger.warning("Manual file not found: %s", path)
                 continue
             
             if path.suffix.lower() != ".pdf":
-                print(f"  Skipping non-PDF file: {file_name}")
+                logger.debug("Skipping non-PDF file: %s", file_name)
                 continue
             
-            print(f"  Processing PDF: {file_name}")
+            logger.debug("Processing PDF: %s", file_name)
             
             # Extract PDF with OCR (includes image extraction)
             ocr_results = extract_pdf_with_ocr(path, images_dir)
             
             if not ocr_results:
-                print(f"  Warning: No pages extracted from {file_name}")
+                logger.warning("No pages extracted from %s", file_name)
                 continue
             
-            print(f"  [OK] Extracted {len(ocr_results)} pages")
+            logger.debug("Extracted %d pages", len(ocr_results))
             
             # Convert OCR results to Document objects
             for page_data in ocr_results:
@@ -131,7 +134,7 @@ def build_vectorstore() -> None:
     """Build a fresh Chroma vector store from all manuals."""
     documents = list(load_manuals_with_metadata())
     if not documents:
-        print("No manuals found; skipping vector store build.")
+        logger.info("No manuals found; skipping vector store build.")
         return
 
     chunks = _split_documents(documents)
@@ -142,7 +145,7 @@ def build_vectorstore() -> None:
         embedding=embeddings,
         persist_directory=str(settings.VECTORDB_DIR),
     )
-    print(f"Vector store built at {settings.VECTORDB_DIR}")
+    logger.info("Vector store built at %s", settings.VECTORDB_DIR)
 
 
 def add_device_manuals(device_id: str) -> None:
@@ -155,7 +158,7 @@ def add_device_manuals(device_id: str) -> None:
 
     documents = list(_load_manual_files_for_device(device))
     if not documents:
-        print(f"No manuals found for device {device_id}")
+        logger.info("No manuals found for device %s", device_id)
         return
 
     chunks = _split_documents(documents)
@@ -166,8 +169,8 @@ def add_device_manuals(device_id: str) -> None:
         embedding_function=embeddings,
     )
     store.add_documents(chunks)
-    store.persist()
-    print(f"Added manuals for device {device_id} to vector store.")
+    # Note: ChromaDB auto-persists in v0.4+, no need to call persist()
+    logger.info("Added manuals for device %s to vector store.", device_id)
 
 
 def remove_device_from_vectorstore(device_id: str) -> None:
@@ -182,15 +185,15 @@ def remove_device_from_vectorstore(device_id: str) -> None:
     # Delete all documents with matching device_id
     try:
         store.delete(where={"device_id": device_id})
-        store.persist()
-        print(f"[OK] Removed device '{device_id}' from vector store")
+        # Note: ChromaDB auto-persists in v0.4+, no need to call persist()
+        logger.info("Removed device '%s' from vector store", device_id)
     except Exception as e:
-        print(f"[WARN] Failed to remove device from vector store: {e}")
+        logger.warning("Failed to remove device from vector store: %s", e)
 
 
 def replace_device_manuals(device_id: str) -> None:
     """Replace manuals for a device (delete old, add new)."""
-    print(f"[INFO] Replacing manuals for device '{device_id}'")
+    logger.info("Replacing manuals for device '%s'", device_id)
     
     # Remove old embeddings
     remove_device_from_vectorstore(device_id)
@@ -198,7 +201,7 @@ def replace_device_manuals(device_id: str) -> None:
     # Add new embeddings
     add_device_manuals(device_id)
     
-    print(f"[OK] Successfully replaced manuals for device '{device_id}'")
+    logger.info("Successfully replaced manuals for device '%s'", device_id)
 
 
 if __name__ == "__main__":

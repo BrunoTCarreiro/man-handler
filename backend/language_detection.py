@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import fitz  # PyMuPDF
 from langdetect import detect, LangDetectException
+
+logger = logging.getLogger("backend.language_detection")
 
 
 # Language ranking for translation ease (lower = easier to translate to English)
@@ -63,7 +66,7 @@ def detect_page_language(pdf_path: Path | str, page_num: int) -> str | None:
         return lang
         
     except (LangDetectException, Exception) as e:
-        print(f"    [WARN] Language detection failed for page {page_num + 1}: {e}")
+        logger.warning("Language detection failed for page %d: %s", page_num + 1, e)
         return None
 
 
@@ -77,14 +80,14 @@ def scan_pdf_languages(pdf_path: Path | str, sample_interval: int = 3) -> Dict[i
     Returns:
         Dictionary mapping page numbers to language codes
     """
-    print(f"  Scanning PDF for language sections...")
+    logger.info("Scanning PDF for language sections...")
     
     try:
         doc = fitz.open(str(pdf_path))
         page_count = len(doc)
         doc.close()
     except Exception as e:
-        print(f"  [ERROR] Failed to open PDF: {e}")
+        logger.error("Failed to open PDF: %s", e)
         return {}
     
     languages: Dict[int, str] = {}
@@ -96,14 +99,14 @@ def scan_pdf_languages(pdf_path: Path | str, sample_interval: int = 3) -> Dict[i
         lang = detect_page_language(pdf_path, page_num)
         if lang:
             languages[page_num] = lang
-            print(f"    Page {page_num + 1}: {lang}")
+            logger.debug("Page %d: %s", page_num + 1, lang)
     
     # Then sample remaining pages at intervals
     for page_num in range(first_pages_to_check, page_count, sample_interval):
         lang = detect_page_language(pdf_path, page_num)
         if lang:
             languages[page_num] = lang
-            print(f"    Page {page_num + 1}: {lang}")
+            logger.debug("Page %d: %s", page_num + 1, lang)
     
     return languages
 
@@ -181,15 +184,15 @@ def select_best_language_section(sections: List[Dict]) -> Dict | None:
     if english_sections:
         # Select longest English section
         best_section = max(english_sections, key=lambda s: s["page_count"])
-        print(f"  [INFO] Found {len(english_sections)} English section(s)")
-        print(f"  [INFO] Selected longest English section: "
-              f"pages {best_section['start_page'] + 1}-{best_section['end_page'] + 1} "
-              f"({best_section['page_count']} pages)")
+        logger.info("Found %d English section(s)", len(english_sections))
+        logger.info("Selected longest English section: pages %d-%d (%d pages)",
+                    best_section['start_page'] + 1, best_section['end_page'] + 1,
+                    best_section['page_count'])
         return best_section
     
     # No English found - fall back to easiest language to translate
-    print(f"  [WARN] No English sections found")
-    print(f"  [INFO] Selecting section with easiest translation...")
+    logger.warning("No English sections found")
+    logger.info("Selecting section with easiest translation...")
     
     def score_section(section: Dict) -> Tuple[int, int]:
         lang = section["language"]
@@ -203,10 +206,10 @@ def select_best_language_section(sections: List[Dict]) -> Dict | None:
     best_section = min(sections, key=score_section)
     lang_name = get_language_name(best_section["language"])
     
-    print(f"  [INFO] Selected {lang_name} section: "
-          f"pages {best_section['start_page'] + 1}-{best_section['end_page'] + 1} "
-          f"({best_section['page_count']} pages)")
-    print(f"  [INFO] This section will be translated to English")
+    logger.info("Selected %s section: pages %d-%d (%d pages)",
+                lang_name, best_section['start_page'] + 1, best_section['end_page'] + 1,
+                best_section['page_count'])
+    logger.info("This section will be translated to English")
     
     return best_section
 
@@ -229,28 +232,29 @@ def detect_and_select_language_section(
         total_pages = len(doc)
         doc.close()
     except Exception as e:
-        print(f"  [ERROR] Failed to open PDF: {e}")
+        logger.error("Failed to open PDF: %s", e)
         return None
     
     # Scan for languages
     languages = scan_pdf_languages(pdf_path, sample_interval)
     
     if not languages:
-        print("  [WARN] No languages detected, will process all pages")
+        logger.warning("No languages detected, will process all pages")
         return None
     
     # Group into sections
     sections = group_consecutive_pages(languages, total_pages)
     
     if not sections:
-        print("  [WARN] No language sections found, will process all pages")
+        logger.warning("No language sections found, will process all pages")
         return None
     
     # Debug: Show all detected sections
-    print(f"  [INFO] Detected {len(sections)} section(s):")
+    logger.info("Detected %d section(s):", len(sections))
     for sec in sections:
         lang_name = get_language_name(sec["language"])
-        print(f"    - {lang_name}: pages {sec['start_page'] + 1}-{sec['end_page'] + 1} ({sec['page_count']} pages)")
+        logger.info("  - %s: pages %d-%d (%d pages)",
+                    lang_name, sec['start_page'] + 1, sec['end_page'] + 1, sec['page_count'])
     
     # Select best section
     best_section = select_best_language_section(sections)

@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional
 from langchain_community.vectorstores import Chroma
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 
 from . import settings
@@ -79,48 +78,10 @@ def _format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
 
-def _get_chain(retriever):
-    """Build RAG chain using LCEL (LangChain Expression Language)."""
-    llm = ChatOllama(model=settings.LLM_MODEL_NAME)
-    prompt = PromptTemplate(
-        template=PROMPT_TEMPLATE,
-        input_variables=["context", "question"],
-    )
-    
-    # Extract question from input dict
-    def get_question(input_dict):
-        return input_dict["question"]
-    
-    # Build chain: extract question -> retrieve -> format -> prompt -> llm -> parse
-    chain = (
-        {
-            "context": RunnableLambda(get_question) | retriever | _format_docs,
-            "question": RunnableLambda(get_question),
-        }
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
-    return chain
-
-
-def answer_question(
-    question: str,
-    device_id: Optional[str] = None,
-    room: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Run a RAG query and return answer plus structured sources."""
-    retriever = _build_retriever(device_id=device_id, room=room)
-    chain = _get_chain(retriever)
-    
-    # Get answer from chain
-    answer: str = chain.invoke({"question": question})
-    
-    # Get source documents separately for citation
-    source_docs = retriever.invoke(question)
-
+def _build_sources_from_docs(docs) -> List[Dict[str, Any]]:
+    """Extract source metadata from retrieved documents."""
     sources: List[Dict[str, Any]] = []
-    for doc in source_docs:
+    for doc in docs:
         meta = doc.metadata or {}
         sources.append(
             {
@@ -134,6 +95,32 @@ def answer_question(
                 "snippet": doc.page_content[:400],
             }
         )
+    return sources
+
+
+def answer_question(
+    question: str,
+    device_id: Optional[str] = None,
+    room: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Run a RAG query and return answer plus structured sources."""
+    retriever = _build_retriever(device_id=device_id, room=room)
+    llm = ChatOllama(model=settings.LLM_MODEL_NAME)
+    prompt = PromptTemplate(
+        template=PROMPT_TEMPLATE,
+        input_variables=["context", "question"],
+    )
+    
+    # Retrieve documents once and cache for both context and sources
+    source_docs = retriever.invoke(question)
+    context = _format_docs(source_docs)
+    
+    # Build and run the chain with pre-retrieved context
+    chain = prompt | llm | StrOutputParser()
+    answer: str = chain.invoke({"context": context, "question": question})
+    
+    # Build sources from the same retrieved documents
+    sources = _build_sources_from_docs(source_docs)
 
     return {"answer": answer, "sources": sources}
 

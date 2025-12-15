@@ -297,11 +297,11 @@ export function App() {
                 <p>
                   Select a device and ask a question like
                   {" "}
-                  <strong>"How do I clean the filter?"</strong>
+                  <strong>&quot;How do I clean the filter?&quot;</strong>
                   {" "}
                   or
                   {" "}
-                  <strong>"What does error code E23 mean?"</strong>.
+                  <strong>&quot;What does error code E23 mean?&quot;</strong>.
                 </p>
               </div>
             )}

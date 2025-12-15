@@ -1,0 +1,80 @@
+.error-boundary {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle at top, #0f172a 0, #020617 55%, #020617 100%);
+}
+
+.error-boundary-content {
+  max-width: 480px;
+  padding: 32px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.75);
+  text-align: center;
+}
+
+.error-boundary-content h2 {
+  margin: 0 0 12px;
+  color: #f87171;
+  font-size: 1.5rem;
+}
+
+.error-boundary-content p {
+  margin: 0 0 20px;
+  color: #9ca3af;
+}
+
+.error-details {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.error-details summary {
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.error-details pre {
+  margin: 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #f87171;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.error-actions button {
+  padding: 10px 20px;
+  font-weight: 600;
+}
+
+.error-actions button:first-child {
+  background: linear-gradient(to right, #4f46e5, #06b6d4);
+}
+
+.error-actions button:last-child {
+  background: rgba(100, 116, 139, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #cbd5e1;
+}
+
+.error-actions button:last-child:hover {
+  background: rgba(100, 116, 139, 0.25);
+  border-color: rgba(148, 163, 184, 0.5);
+}
+

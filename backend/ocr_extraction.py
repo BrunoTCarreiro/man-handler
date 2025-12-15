@@ -13,6 +13,7 @@ Uses Prompt 2: "<|grounding|>Convert the document to markdown."
 from __future__ import annotations
 
 import base64
+import logging
 import re
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
@@ -20,6 +21,8 @@ from typing import Callable, Dict, List, Optional, Tuple
 import fitz  # PyMuPDF
 import ollama
 from PIL import Image
+
+logger = logging.getLogger("backend.ocr_extraction")
 
 
 def extract_page_as_image(pdf_path: str | Path, page_num: int, output_path: Path) -> bool:
@@ -49,7 +52,7 @@ def extract_page_as_image(pdf_path: str | Path, page_num: int, output_path: Path
         doc.close()
         return True
     except Exception as e:
-        print(f"Error extracting page {page_num}: {e}")
+        logger.error("Error extracting page %d: %s", page_num, e)
         return False
 
 
@@ -190,7 +193,7 @@ def extract_image_region(page_image_path: Path, coords: List[int], output_path: 
         cropped.save(output_path)
         return True
     except Exception as e:
-        print(f"  Warning: Failed to extract image region: {e}")
+        logger.warning("Failed to extract image region: %s", e)
         return False
 
 
@@ -307,7 +310,7 @@ def extract_pdf_with_ocr(
         page_count = len(doc)
         doc.close()
     except Exception as e:
-        print(f"Error opening PDF {pdf_path}: {e}")
+        logger.error("Error opening PDF %s: %s", pdf_path, e)
         return results
 
     # Determine page range
@@ -315,28 +318,29 @@ def extract_pdf_with_ocr(
     actual_end_page = min(actual_end_page, page_count - 1)
     
     if start_page >= page_count:
-        print(f"  [WARN] Start page {start_page} is beyond document length {page_count}")
+        logger.warning("Start page %d is beyond document length %d", start_page, page_count)
         return results
     
     pages_to_extract = actual_end_page - start_page + 1
-    print(f"  Extracting pages {start_page + 1}-{actual_end_page + 1} ({pages_to_extract} pages) with OCR...")
+    logger.info("Extracting pages %d-%d (%d pages) with OCR...",
+                start_page + 1, actual_end_page + 1, pages_to_extract)
     
     for page_index in range(start_page, actual_end_page + 1):
         # Check for cancellation before processing each page
         if cancellation_check and cancellation_check():
-            print(f"    [INFO] Processing cancelled at page {page_index + 1}/{actual_end_page + 1}")
+            logger.info("Processing cancelled at page %d/%d", page_index + 1, actual_end_page + 1)
             break
         
-        # Print progress for every page
+        # Log progress for every page
         current_progress = page_index - start_page + 1
-        print(f"    Processing page {page_index + 1} ({current_progress}/{pages_to_extract})...")
+        logger.debug("Processing page %d (%d/%d)...", page_index + 1, current_progress, pages_to_extract)
         
         page_result = extract_page_with_ocr(pdf_path, page_index, images_dir)
         if page_result is None:
-            print(f"    [WARN] Failed to extract page {page_index + 1}")
+            logger.warning("Failed to extract page %d", page_index + 1)
             continue
         
-        print(f"    [OK] Page {page_index + 1} complete ({current_progress}/{pages_to_extract})")
+        logger.debug("Page %d complete (%d/%d)", page_index + 1, current_progress, pages_to_extract)
         results.append(page_result)
         
         if progress_callback:

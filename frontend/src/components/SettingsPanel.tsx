@@ -62,7 +62,7 @@ export function SettingsPanel({
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (_event: MouseEvent) => {
       if (openDropdown) {
         setOpenDropdown(null);
       }

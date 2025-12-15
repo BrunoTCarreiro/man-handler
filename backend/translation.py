@@ -6,11 +6,14 @@ Uses local LLM via Ollama for privacy-first translation.
 
 from __future__ import annotations
 
+import logging
 import re
 
 import ollama
 
 from . import settings
+
+logger = logging.getLogger("backend.translation")
 
 
 def _strip_llm_preamble_and_fences(text: str) -> str:
@@ -171,8 +174,8 @@ def translate_text(
         return cleaned
 
     except Exception as e:
-        print(f"  Warning: Translation failed: {e}")
-        print("  Returning original text")
+        logger.warning("Translation failed: %s", e)
+        logger.warning("Returning original text")
         return text
 
 
@@ -267,7 +270,7 @@ LANGUAGE:"""
         return language
         
     except Exception as e:
-        print(f"  Warning: Language detection failed: {e}")
+        logger.warning("Language detection failed: %s", e)
         return "Unknown"
 
 
