@@ -120,6 +120,7 @@ VITE_API_BASE_URL=http://localhost:8000
    ```bash
    cd backend
    . .venv/bin/activate
+   cd ..
    python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
    ```
 

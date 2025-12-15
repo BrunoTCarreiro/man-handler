@@ -59,7 +59,7 @@ cleanup() {
 trap cleanup INT TERM EXIT
 
 echo "[INFO] Starting Backend API (port 8000)..."
-(cd "$ROOT_DIR/backend" && "$BACKEND_PY" -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000) &
+(cd "$ROOT_DIR" && "$BACKEND_PY" -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000) &
 BACKEND_PID=$!
 echo "[OK] Backend starting (pid $BACKEND_PID)"
 
