@@ -342,7 +342,7 @@ def process_manual_background(token: str, pdf_path: Path, images_dir: Path, refe
             pdf_path,
             reference_md,
             images_dir,
-            translate=True,
+            translate=not is_english,
             skip_index_pages=0,
             translation_model=None,
         )
@@ -362,7 +362,7 @@ def process_manual_background(token: str, pdf_path: Path, images_dir: Path, refe
                 processing_status[token]["stage"] = "complete"
                 processing_status[token]["status"] = "complete"
                 processing_status[token]["detected_language"] = detected_language
-                processing_status[token]["translated"] = detected_language.lower() != "english"
+                processing_status[token]["translated"] = not is_english
                 processing_status[token]["output_filename"] = reference_md.name
         
         # Persist reference filename and detected language

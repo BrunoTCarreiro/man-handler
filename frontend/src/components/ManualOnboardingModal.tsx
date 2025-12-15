@@ -45,6 +45,7 @@ export function ManualOnboardingModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
+  const [isUploadComplete, setIsUploadComplete] = useState(false);
   const pollingIntervalRef = useRef<number | null>(null);
   const [currentToken, setCurrentToken] = useState<string | null>(null);
   const processLogRef = useRef<HTMLDivElement | null>(null);
@@ -76,6 +77,7 @@ export function ManualOnboardingModal({
     setIsProcessing(false);
     setIsAnalyzing(false);
     setIsCommitting(false);
+    setIsUploadComplete(false);
     setCurrentToken(null);
     stopStatusPolling();
   };
@@ -313,6 +315,9 @@ export function ManualOnboardingModal({
         setCommitStatus(`[OK] Upload complete for device "${device.name}"!`);
       }
       
+      // Mark upload as complete to keep buttons disabled
+      setIsUploadComplete(true);
+      
       // Refresh device list and close modal
       const updatedDevices = await getDevices();
       setTimeout(() => {
@@ -343,7 +348,7 @@ export function ManualOnboardingModal({
   };
 
   const canGoPrevious = () => {
-    return currentStep !== "file-selection" && !isProcessing && !isAnalyzing && !isCommitting;
+    return currentStep !== "file-selection" && !isProcessing && !isAnalyzing && !isCommitting && !isUploadComplete;
   };
 
   const handleNext = () => {
@@ -581,7 +586,7 @@ export function ManualOnboardingModal({
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
           <div className="modal-header">
             <h2>{replacingDevice ? `Replace Manual - ${replacingDevice.name}` : 'Manual Onboarding'}</h2>
-            <button className="close-button" onClick={handleClose} disabled={isProcessing || isAnalyzing || isCommitting} aria-label="Close">
+            <button className="close-button" onClick={handleClose} disabled={isProcessing || isAnalyzing || isCommitting || isUploadComplete} aria-label="Close">
               X
             </button>
           </div>
@@ -623,6 +628,7 @@ export function ManualOnboardingModal({
             <button
               onClick={handleClose}
               className="footer-button cancel-wizard"
+              disabled={isUploadComplete}
             >
               Cancel
             </button>
@@ -637,11 +643,13 @@ export function ManualOnboardingModal({
             ) : (
               <button
                 onClick={handleCommit}
-                disabled={isCommitting || !manualMetadata.id || !manualMetadata.name}
+                disabled={isCommitting || isUploadComplete || !manualMetadata.id || !manualMetadata.name}
                 className="footer-button primary"
               >
                 {isCommitting 
                   ? (replacingDevice ? "Replacing..." : "Uploading...") 
+                  : isUploadComplete
+                  ? "✓ Complete"
                   : (replacingDevice ? "Replace Manual" : "Upload Manual")}
               </button>
             )}

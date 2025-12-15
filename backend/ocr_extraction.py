@@ -203,6 +203,7 @@ def clean_grounding_tags(text: str) -> str:
     Strips patterns like:
         <|ref|>TYPE<|/ref|><|det|>[[x1, y1, x2, y2]]<|/det|>
     and any stray <|...|> tags, leaving only the readable markdown.
+    Also converts LaTeX symbols to Unicode equivalents.
     """
     # Remove grounding tag patterns
     pattern = (
@@ -212,6 +213,50 @@ def clean_grounding_tags(text: str) -> str:
 
     # Remove any remaining standalone tags like <|ref|>, <|/ref|>, etc.
     cleaned = re.sub(r"<\|[^>]+\|>", "", cleaned)
+
+    # Convert LaTeX symbols to Unicode equivalents
+    # Handles both \(...\) and $...$ inline math notation
+    latex_symbols = {
+        r"\\rightarrow": "→",
+        r"\\leftarrow": "←",
+        r"\\uparrow": "↑",
+        r"\\downarrow": "↓",
+        r"\\leftrightarrow": "↔",
+        r"\\Rightarrow": "⇒",
+        r"\\Leftarrow": "⇐",
+        r"\\times": "×",
+        r"\\div": "÷",
+        r"\\pm": "±",
+        r"\\leq": "≤",
+        r"\\geq": "≥",
+        r"\\neq": "≠",
+        r"\\approx": "≈",
+        r"\\infty": "∞",
+        r"\\degree": "°",
+        r"\\circ": "°",
+        r"\\alpha": "α",
+        r"\\beta": "β",
+        r"\\gamma": "γ",
+        r"\\delta": "δ",
+        r"\\mu": "μ",
+        r"\\omega": "ω",
+        r"\\sum": "∑",
+        r"\\sqrt": "√",
+        r"\\checkmark": "✓",
+        r"\\bullet": "•",
+        r"\\cdot": "·",
+    }
+    
+    for latex, unicode_char in latex_symbols.items():
+        # Match \symbol inside \(...\) or $...$
+        cleaned = re.sub(rf"\\\({latex}\\\)", unicode_char, cleaned)
+        cleaned = re.sub(rf"\${latex}\$", unicode_char, cleaned)
+        # Also match standalone \symbol (without math delimiters)
+        cleaned = re.sub(latex, unicode_char, cleaned)
+    
+    # Remove empty math delimiters that might be left over
+    cleaned = re.sub(r"\\\(\s*\\\)", "", cleaned)
+    cleaned = re.sub(r"\$\s*\$", "", cleaned)
 
     return cleaned.strip()
 

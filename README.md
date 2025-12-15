@@ -352,4 +352,3 @@ Recipients should:
 3. Upload their own manuals via UI
 4. No manual data setup required!
 
-
