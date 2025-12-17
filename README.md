@@ -111,6 +111,12 @@ This will automatically start all three services (Ollama, Backend, Frontend). On
 
 **Network Access:** By default, services are only accessible on `localhost`. Use the `-Network` flag (or `-n`) to expose services to your local network, allowing other devices to access the app.
 
+**Restart Backend:** If the backend crashes, you can restart it using:
+- Windows: `.\restart-backend.ps1 [-Network]`
+- Linux/macOS: `./restart-backend.sh [-n|--network]`
+
+Or use the REST API endpoint: `POST /restart` (triggers graceful shutdown; process manager should restart it).
+
 #### Environment Variables
 
 ##### Backend Configuration

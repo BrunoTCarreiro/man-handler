@@ -146,6 +146,32 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@app.post("/restart")
+def restart_backend() -> dict:
+    """Restart the backend server.
+    
+    This endpoint triggers a graceful shutdown. The process manager
+    (e.g., systemd, supervisor, or start script) should handle restarting.
+    For development, this can be used with auto-reload enabled.
+    """
+    import os
+    import signal
+    
+    logger.info("Restart requested via /restart endpoint")
+    
+    # In production, you might want to check for authentication here
+    # For now, we'll just log and exit, letting the process manager restart
+    
+    # Send SIGTERM to current process (graceful shutdown)
+    # The start script or process manager should handle restart
+    os.kill(os.getpid(), signal.SIGTERM)
+    
+    return {
+        "status": "restarting",
+        "message": "Backend restart initiated. The server will shut down and should be restarted by the process manager."
+    }
+
+
 @app.get("/devices", response_model=List[Device])
 def list_devices() -> List[Device]:
     return load_devices()
@@ -345,6 +371,7 @@ def process_manual_background(token: str, pdf_path: Path, images_dir: Path, refe
             translate=not is_english,
             skip_index_pages=0,
             translation_model=None,
+            progress_callback=add_log,
         )
         
         if check_cancelled():

@@ -64,21 +64,34 @@ def generate_reference_md(
     translate: bool = True,
     skip_index_pages: int = 0,
     translation_model: str | None = None,
+    progress_callback: callable | None = None,
 ):
     """Generate user reference markdown with inline images.
     
     No page numbers, translated to English, images rendered inline.
+    
+    Args:
+        results: List of OCR extraction results
+        pdf_path: Path to source PDF
+        output_path: Path for output markdown file
+        images_dir: Directory containing extracted images
+        translate: Whether to translate to English
+        skip_index_pages: Number of index pages to skip
+        translation_model: Ollama model to use for translation
+        progress_callback: Optional callback function(progress_msg: str) for progress updates
     """
-    print(f"\n[INFO] Generating user reference markdown: {output_path.name}")
+    log = progress_callback if progress_callback else lambda msg: print(f"  {msg}")
+    
+    log("[INFO] Generating user reference markdown: {output_path.name}")
     
     # Detect language if translating
     if translate and results:
         sample_text = results[0]["text"]
         detected_lang = detect_language(sample_text, model=translation_model)
-        print(f"  Detected language: {detected_lang}")
+        log(f"Detected language: {detected_lang}")
         
         if detected_lang.lower() == "english":
-            print(f"  Text already in English, skipping translation")
+            log("Text already in English, skipping translation")
             translate = False
     
     # Calculate relative path from output_path to images_dir so that markdown
@@ -89,6 +102,10 @@ def generate_reference_md(
     
     # Build body content in memory so we can run a second-pass cleanup.
     body_chunks: list[str] = []
+    
+    # Count pages that will actually be processed (excluding skipped)
+    total_pages = len([r for idx, r in enumerate(results, 1) if idx > skip_index_pages])
+    pages_processed = 0
 
     for idx, r in enumerate(results, 1):
         # Optionally skip the first N pages, which are usually the index / TOC
@@ -99,13 +116,23 @@ def generate_reference_md(
 
         # First-pass translation, page-by-page
         if translate:
-            if idx % 10 == 1:  # Progress indicator
-                print(f"  Translating... ({idx}/{len(results)} pages)")
-            text = translate_text(
-                text,
-                target_lang="English",
-                model=translation_model,
-            )
+            pages_processed += 1
+            # Show progress more frequently: every page for small docs, every 5 for larger ones
+            progress_interval = 1 if total_pages <= 20 else 5
+            if pages_processed == 1 or pages_processed % progress_interval == 0 or pages_processed == total_pages:
+                percentage = int((pages_processed / total_pages) * 100)
+                log(f"[INFO] Translating page {pages_processed}/{total_pages} ({percentage}%)...")
+            
+            try:
+                text = translate_text(
+                    text,
+                    target_lang="English",
+                    model=translation_model,
+                )
+            except Exception as e:
+                log(f"[WARN] Translation failed for page {pages_processed}: {str(e)}")
+                log("[INFO] Using original text for this page")
+                # Continue with original text if translation fails
 
         body_chunks.append(text)
 
@@ -121,11 +148,15 @@ def generate_reference_md(
     # - Strip leftover ```markdown fences
     # - Remove LLM commentary lines
     # - Re-translate obviously Spanish-heavy paragraphs
+    if translate:
+        log("[INFO] Running final translation cleanup pass...")
     full_body = "\n\n".join(body_chunks)
     full_body = clean_translated_markdown(
         full_body,
         model=translation_model if translate else None,
     )
+    if translate:
+        log("[OK] Translation cleanup complete")
 
     with output_path.open("w", encoding="utf-8") as f:
         # Header
@@ -143,7 +174,7 @@ def generate_reference_md(
         f.write(full_body)
         f.write("\n")
     
-    print(f"[OK] Reference markdown saved")
+    log("[OK] Reference markdown saved")
 
 
 def main():

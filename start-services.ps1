@@ -63,11 +63,20 @@ if ($exposeNetwork) {
     Write-Host ""
     Write-Host "Network access (from other devices on your local network):" -ForegroundColor Yellow
     try {
-        $networkIPs = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } | Select-Object -ExpandProperty IPAddress
+        # Get network IPs, excluding localhost, link-local, and virtual adapters (WSL, Hyper-V, etc.)
+        $virtualAdapterKeywords = @('WSL', 'Hyper-V', 'vEthernet', 'VirtualBox', 'VMware', 'Docker', 'WSL2')
+        $networkIPs = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { 
+            $ip = $_.IPAddress
+            $alias = $_.InterfaceAlias
+            $ip -notlike '127.*' -and 
+            $ip -notlike '169.254.*' -and
+            -not ($virtualAdapterKeywords | Where-Object { $alias -like "*$_*" })
+        } | Select-Object IPAddress, InterfaceAlias
+        
         if ($networkIPs) {
-            foreach ($ip in $networkIPs) {
-                Write-Host "  Backend API:  http://$ip`:8000" -ForegroundColor Cyan
-                Write-Host "  Frontend UI:  http://$ip`:5173" -ForegroundColor Cyan
+            foreach ($ipInfo in $networkIPs) {
+                Write-Host "  Backend API:  http://$($ipInfo.IPAddress):8000" -ForegroundColor Cyan
+                Write-Host "  Frontend UI:  http://$($ipInfo.IPAddress):5173" -ForegroundColor Cyan
             }
         } else {
             Write-Host "  (Run 'ipconfig' to find your local IP address)" -ForegroundColor Gray
