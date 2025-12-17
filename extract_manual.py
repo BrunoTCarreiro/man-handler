@@ -15,6 +15,7 @@ Outputs:
 import argparse
 from pathlib import Path
 from datetime import datetime
+from typing import Callable, Optional
 
 from backend.ocr_extraction import extract_pdf_with_ocr
 from backend.translation import (
@@ -63,8 +64,8 @@ def generate_reference_md(
     images_dir: Path,
     translate: bool = True,
     skip_index_pages: int = 0,
-    translation_model: str | None = None,
-    progress_callback: callable | None = None,
+    translation_model: Optional[str] = None,
+    progress_callback: Optional[Callable[[str], None]] = None,
 ):
     """Generate user reference markdown with inline images.
     
