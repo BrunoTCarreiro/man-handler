@@ -84,4 +84,37 @@
   color: #fca5a5;
 }
 
+@media (max-width: 768px) {
+  .confirm-modal {
+    width: calc(100vw - 24px);
+    margin: 12px;
+  }
+  
+  .confirm-header {
+    padding: 14px 16px;
+  }
+  
+  .confirm-header h3 {
+    font-size: 1rem;
+  }
+  
+  .confirm-body {
+    padding: 14px 16px;
+    font-size: 0.9rem;
+  }
+  
+  .confirm-footer {
+    padding: 12px 16px 16px;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  
+  .confirm-btn {
+    width: 100%;
+    padding: 14px 20px;
+    min-height: 44px;
+    font-size: 0.95rem;
+  }
+}
+
 

@@ -19,9 +19,46 @@
   width: 90%;
   max-width: 900px;
   max-height: 85vh;
+  max-height: 85dvh; /* Dynamic viewport height - accounts for mobile browser UI */
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 768px) {
+  .view-modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  
+  .view-modal-content {
+    width: 100%;
+    max-width: 100%;
+    max-height: 95vh;
+    max-height: 95dvh; /* Dynamic viewport height - accounts for mobile browser UI */
+    border-radius: 16px 16px 0 0;
+  }
+  
+  .view-modal-header {
+    padding: 16px;
+  }
+  
+  .view-modal-header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .view-modal-body {
+    padding: 16px;
+    min-height: 300px;
+  }
+  
+  .markdown-content {
+    padding: 16px;
+  }
+  
+  .view-modal-footer {
+    padding: 12px 16px;
+  }
 }
 
 .view-modal-header {

@@ -28,6 +28,7 @@
   flex-direction: column;
   gap: 16px;
   max-height: 60vh;
+  max-height: 60dvh; /* Dynamic viewport height - accounts for mobile browser UI */
   overflow-y: auto;
 }
 
@@ -110,11 +111,32 @@
 @media (max-width: 768px) {
   .edit-modal-content {
     max-width: 100%;
-    border-radius: 0;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .edit-modal-header {
+    padding: 16px 20px 12px;
+  }
+  
+  .edit-modal-header h2 {
+    font-size: 1.2rem;
   }
 
   .edit-modal-body {
     max-height: 70vh;
+    max-height: 70dvh; /* Dynamic viewport height - accounts for mobile browser UI */
+    padding: 20px;
+  }
+  
+  .edit-modal-footer {
+    padding: 12px 20px 20px;
+    flex-direction: column-reverse;
+  }
+  
+  .edit-button {
+    width: 100%;
+    padding: 14px 20px;
+    min-height: 44px;
   }
 }
 

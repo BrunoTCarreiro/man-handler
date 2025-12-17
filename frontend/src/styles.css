@@ -4,19 +4,76 @@
   box-sizing: border-box;
 }
 
+html {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height - accounts for mobile browser UI */
+  background: #020617; /* Solid fallback color */
+  background: radial-gradient(circle at top, #0f172a 0, #020617 55%, #020617 100%);
+}
+
 body {
   margin: 0;
+  padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #020617; /* Solid fallback color */
   background: radial-gradient(circle at top, #0f172a 0, #020617 55%, #020617 100%);
   color: #e5e7eb;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent text selection issues on mobile */
+  -webkit-tap-highlight-color: transparent;
+  /* Prevent horizontal overflow */
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height - accounts for mobile browser UI */
+  height: 100%;
+  position: relative;
 }
+
+#root {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #020617; /* Solid fallback color */
+  background: radial-gradient(circle at top, #0f172a 0, #020617 55%, #020617 100%);
+  position: relative;
+}
+
 
 .app-root {
   min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height - accounts for mobile browser UI */
+  height: 100%;
   display: flex;
   flex-direction: column;
   padding: 16px;
   gap: 16px;
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  background: transparent; /* Inherit from parent */
+}
+
+@media (max-width: 768px) {
+  .app-root {
+    padding: 8px;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-root {
+    padding: 8px;
+    gap: 10px;
+  }
 }
 
 .top-bar {
@@ -25,16 +82,39 @@ body {
   align-items: flex-end;
   gap: 16px;
   flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.top-bar > div {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .top-bar h1 {
   margin: 0;
   font-size: 1.75rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .subtitle {
   margin: 4px 0 0;
   color: #9ca3af;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .top-bar h1 {
+    font-size: 1.4rem;
+  }
+  
+  .subtitle {
+    font-size: 0.85rem;
+  }
 }
 
 .header-actions {
@@ -69,6 +149,15 @@ body {
   font-weight: 600;
 }
 
+@media (max-width: 768px) {
+  .add-manual-button,
+  .settings-button {
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    min-height: 44px; /* Better touch target */
+  }
+}
+
 .settings-button:hover {
   background: rgba(100, 116, 139, 0.25);
   border-color: rgba(148, 163, 184, 0.5);
@@ -99,6 +188,15 @@ button {
   font-size: 0.9rem;
 }
 
+@media (max-width: 768px) {
+  /* Prevent iOS zoom on input focus - must be at least 16px */
+  select,
+  input[type="text"],
+  input[type="file"] {
+    font-size: 16px;
+  }
+}
+
 select:disabled {
   opacity: 0.5;
 }
@@ -110,6 +208,9 @@ button {
   color: white;
   font-weight: 500;
   transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.1s ease;
+  /* Better touch targets on mobile */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:disabled {
@@ -126,6 +227,10 @@ button:not(:disabled):hover {
   flex: 1;
   display: flex;
   align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .chat-panel {
@@ -135,11 +240,12 @@ button:not(:disabled):hover {
   background: radial-gradient(circle at top, #020617 0, #020617 40%, #020617 100%);
   border: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 0 18px 55px rgba(15, 23, 42, 0.75);
-}
-
-.chat-panel {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .messages {
@@ -149,6 +255,15 @@ button:not(:disabled):hover {
   flex-direction: column;
   gap: 12px;
   padding: 4px 4px 8px;
+  /* Smooth scrolling on mobile */
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .messages {
+    gap: 10px;
+    padding: 4px 2px 8px;
+  }
 }
 
 .message {
@@ -158,6 +273,13 @@ button:not(:disabled):hover {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+@media (max-width: 768px) {
+  .message {
+    max-width: 85%;
+    padding: 12px 14px;
+  }
 }
 
 .message-user {
@@ -187,6 +309,9 @@ button:not(:disabled):hover {
   font-size: 0.9rem;
   line-height: 1.45;
   white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .sources {
@@ -242,6 +367,9 @@ button:not(:disabled):hover {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid rgba(55, 65, 81, 0.7);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .device-dropdown {
@@ -255,6 +383,8 @@ button:not(:disabled):hover {
   font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.2s;
+  box-sizing: border-box;
+  width: auto;
 }
 
 .device-dropdown:hover {
@@ -270,6 +400,45 @@ button:not(:disabled):hover {
 .input-bar input[type="text"] {
   flex: 1;
   border-radius: 999px;
+  min-width: 0; /* Allow flex shrinking */
+}
+
+@media (max-width: 768px) {
+  .input-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .device-dropdown {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    order: 1;
+    padding: 14px 16px;
+    font-size: 16px; /* Prevent iOS zoom */
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+  
+  .input-bar input[type="text"] {
+    order: 2;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: 14px 16px;
+    font-size: 16px; /* Prevent iOS zoom */
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+  
+  .input-bar button {
+    order: 3;
+    width: 100%;
+    padding: 14px 20px;
+    min-height: 44px;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+  }
 }
 
 .empty-state {
@@ -278,33 +447,85 @@ button:not(:disabled):hover {
   color: #9ca3af;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 768px) {
   .top-bar {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .top-bar > div {
+    width: 100%;
+    max-width: 100%;
   }
 
   .header-actions {
     width: 100%;
+    max-width: 100%;
     flex-direction: column;
     align-items: stretch;
   }
 
   .filters {
     width: 100%;
+    max-width: 100%;
   }
 
   .filter {
     flex: 1;
+    min-width: 0;
   }
 
   .action-buttons {
     width: 100%;
+    max-width: 100%;
+    display: flex;
+    gap: 8px;
   }
 
   .add-manual-button,
   .settings-button {
     flex: 1;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .chat-panel {
+    padding: 10px;
+    border-radius: 12px;
+  }
+  
+  .messages {
+    padding: 4px 2px 8px;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .message {
+    max-width: 90%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  .message-content {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  .empty-state {
+    padding: 20px 12px;
+    font-size: 0.9rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .empty-state strong {
+    display: block;
+    margin-top: 8px;
   }
 }
 

@@ -4,6 +4,7 @@
   right: -400px;
   width: 400px;
   height: 100vh;
+  height: 100dvh; /* Dynamic viewport height - accounts for mobile browser UI */
   background: radial-gradient(circle at top, #0f172a 0, #020617 55%, #020617 100%);
   border-left: 1px solid rgba(148, 163, 184, 0.3);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
@@ -359,6 +360,43 @@
     width: 100%;
     right: -100%;
   }
+  
+  .settings-header {
+    padding: 16px 20px;
+  }
+  
+  .settings-header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .close-settings-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .settings-content {
+    padding: 20px;
+    gap: 24px;
+  }
+  
+  .settings-section h3 {
+    font-size: 1rem;
+  }
+  
+  .section-description {
+    font-size: 0.85rem;
+  }
+
+  .device-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+  
+  .device-info {
+    width: 100%;
+  }
 
   .device-actions {
     width: 100%;
@@ -367,11 +405,44 @@
   .actions-dropdown-button {
     width: 100%;
     justify-content: center;
+    padding: 12px 16px;
+    min-height: 44px;
   }
 
   .actions-dropdown-menu {
     left: 0;
     right: 0;
+    min-width: auto;
+  }
+  
+  .dropdown-item {
+    padding: 14px 16px;
+    min-height: 44px;
+  }
+  
+  .room-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .room-edit-container {
+    width: 100%;
+  }
+  
+  .room-name-input {
+    min-height: 44px;
+  }
+  
+  .room-action-button {
+    min-height: 44px;
+    padding: 10px 16px;
+  }
+  
+  .reset-database-button {
+    width: 100%;
+    padding: 14px 20px;
+    min-height: 44px;
   }
 }
 

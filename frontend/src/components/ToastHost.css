@@ -75,4 +75,34 @@
   color: #67e8f9;
 }
 
+@media (max-width: 768px) {
+  .toast-host {
+    right: 12px;
+    left: 12px;
+    top: 12px;
+    width: auto;
+  }
+  
+  .toast {
+    padding: 14px 16px;
+  }
+  
+  .toast-title {
+    font-size: 0.95rem;
+  }
+  
+  .toast-message {
+    font-size: 0.9rem;
+  }
+  
+  .toast-close {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 
