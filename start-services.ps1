@@ -1,7 +1,23 @@
 # Home Manual Assistant - Start All Services
 # Run this script to start Ollama, Backend, and Frontend
+# Usage: .\start-services.ps1 [-Network] or .\start-services.ps1 -n
+#   -Network, -n: Expose services to local network (default: localhost only)
+
+param(
+    [Parameter()]
+    [Alias("n")]
+    [switch]$Network
+)
+
+# Check if network exposure is requested
+$exposeNetwork = $Network
 
 Write-Host "Starting Home Manual Assistant Services..." -ForegroundColor Cyan
+if ($exposeNetwork) {
+    Write-Host "[INFO] Network exposure enabled - services will be accessible from local network" -ForegroundColor Yellow
+} else {
+    Write-Host "[INFO] Localhost only - use -Network flag to expose to local network" -ForegroundColor Gray
+}
 Write-Host ""
 
 # Check if Ollama is running
@@ -20,7 +36,9 @@ Write-Host ""
 # Start Backend (FastAPI)
 Write-Host "[INFO] Starting Backend API (port 8000)..." -ForegroundColor Yellow
 $backendPath = Join-Path $PSScriptRoot "backend"
-$backendCmd = "& '$backendPath\.venv\Scripts\python.exe' -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000"
+$hostBinding = if ($exposeNetwork) { "0.0.0.0" } else { "127.0.0.1" }
+$exposeNetworkValue = if ($exposeNetwork) { '1' } else { '0' }
+$backendCmd = "`$env:EXPOSE_NETWORK='$exposeNetworkValue'; & '$backendPath\.venv\Scripts\python.exe' -m uvicorn backend.main:app --reload --host $hostBinding --port 8000"
 Start-Process pwsh -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot'; $backendCmd" -WorkingDirectory $PSScriptRoot
 Write-Host "[OK] Backend starting in new window" -ForegroundColor Green
 
@@ -29,7 +47,8 @@ Start-Sleep -Seconds 2
 # Start Frontend (Vite)
 Write-Host "[INFO] Starting Frontend Dev Server (port 5173)..." -ForegroundColor Yellow
 $frontendPath = Join-Path $PSScriptRoot "frontend"
-$frontendCmd = "cd '$frontendPath'; npm run dev"
+$frontendEnv = if ($exposeNetwork) { "VITE_EXPOSE_NETWORK=1" } else { "" }
+$frontendCmd = if ($exposeNetwork) { "`$env:VITE_EXPOSE_NETWORK='1'; cd '$frontendPath'; npm run dev" } else { "cd '$frontendPath'; npm run dev" }
 Start-Process pwsh -ArgumentList "-NoExit", "-Command", "$frontendCmd" -WorkingDirectory $frontendPath
 Write-Host "[OK] Frontend starting in new window" -ForegroundColor Green
 
@@ -37,8 +56,26 @@ Write-Host ""
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 Write-Host "[OK] All services starting!" -ForegroundColor Green
 Write-Host ""
-Write-Host "Backend API:  http://localhost:8000" -ForegroundColor White
-Write-Host "Frontend UI:  http://localhost:5173" -ForegroundColor White
+Write-Host "Local access:" -ForegroundColor Yellow
+Write-Host "  Backend API:  http://localhost:8000" -ForegroundColor White
+Write-Host "  Frontend UI:  http://localhost:5173" -ForegroundColor White
+if ($exposeNetwork) {
+    Write-Host ""
+    Write-Host "Network access (from other devices on your local network):" -ForegroundColor Yellow
+    try {
+        $networkIPs = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } | Select-Object -ExpandProperty IPAddress
+        if ($networkIPs) {
+            foreach ($ip in $networkIPs) {
+                Write-Host "  Backend API:  http://$ip`:8000" -ForegroundColor Cyan
+                Write-Host "  Frontend UI:  http://$ip`:5173" -ForegroundColor Cyan
+            }
+        } else {
+            Write-Host "  (Run 'ipconfig' to find your local IP address)" -ForegroundColor Gray
+        }
+    } catch {
+        Write-Host "  (Run 'ipconfig' to find your local IP address)" -ForegroundColor Gray
+    }
+}
 Write-Host ""
 Write-Host "Press Ctrl+C in each window to stop services" -ForegroundColor Gray
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan

@@ -33,11 +33,22 @@ DEVICE_CATALOG_PATH = CATALOG_DIR / "devices.json"
 
 
 # =============================================================================
+# Network Exposure Configuration
+# =============================================================================
+# Set EXPOSE_NETWORK=1 to allow access from local network (default: localhost only)
+EXPOSE_NETWORK = os.getenv("EXPOSE_NETWORK", "0").strip() in ("1", "true", "yes", "on")
+
+# =============================================================================
 # CORS Configuration
 # =============================================================================
 # Comma-separated list of allowed origins, e.g., "http://localhost:3000,http://localhost:5173"
-_cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
-CORS_ORIGINS: list[str] = [origin.strip() for origin in _cors_origins_env.split(",") if origin.strip()]
+# If EXPOSE_NETWORK is enabled, defaults to "*" to allow all origins
+# For production, specify exact origins for security
+_cors_origins_env = os.getenv("CORS_ORIGINS", "*" if EXPOSE_NETWORK else "http://localhost:3000,http://localhost:5173")
+if _cors_origins_env.strip() == "*":
+    CORS_ORIGINS: list[str] = ["*"]  # Allow all origins (for local network access)
+else:
+    CORS_ORIGINS: list[str] = [origin.strip() for origin in _cors_origins_env.split(",") if origin.strip()]
 
 
 # =============================================================================

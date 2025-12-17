@@ -800,7 +800,12 @@ async def upload_manual(device_id: str, file: UploadFile = File(...)) -> dict:
 
 if __name__ == "__main__":
     import uvicorn
+    import os
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Only bind to 0.0.0.0 if EXPOSE_NETWORK is enabled, otherwise use localhost
+    expose_network = os.getenv("EXPOSE_NETWORK", "0").strip() in ("1", "true", "yes", "on")
+    host = "0.0.0.0" if expose_network else "127.0.0.1"
+    
+    uvicorn.run("main:app", host=host, port=8000, reload=True)
 
 

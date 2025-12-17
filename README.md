@@ -80,21 +80,36 @@ No manual setup required! Use the UI to upload manuals via the wizard.
 
 **Windows**
 ```powershell
-# PowerShell
+# PowerShell - localhost only (default)
 .\start-services.ps1
 
+# PowerShell - expose to local network
+.\start-services.ps1 -Network
+# or
+.\start-services.ps1 -n
+
 # Or use the batch file
-start-services.bat
+start-services.bat          # localhost only
+start-services.bat network  # expose to network
 ```
 
 **macOS/Linux**
 
 ```bash
 chmod +x ./start-services.sh
+
+# Localhost only (default)
 ./start-services.sh
+
+# Expose to local network
+./start-services.sh --network
+# or
+./start-services.sh -n
 ```
 
 This will automatically start all three services (Ollama, Backend, Frontend). On Windows it opens separate terminals; on macOS/Linux it runs everything from your current terminal (Ctrl+C to stop).
+
+**Network Access:** By default, services are only accessible on `localhost`. Use the `-Network` flag (or `-n`) to expose services to your local network, allowing other devices to access the app.
 
 #### Environment Variables
 
