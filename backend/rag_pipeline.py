@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import threading
+from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
 from langchain_community.vectorstores import Chroma
 from langchain_ollama import ChatOllama, OllamaEmbeddings
-from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 from . import settings
+
+# In-memory storage for conversation history per session
+# session_id -> list of (role, content) messages
+_conversation_memory: Dict[str, List[tuple[str, str]]] = defaultdict(list)
+_memory_lock = threading.Lock()
 
 
 def _get_embeddings() -> OllamaEmbeddings:
@@ -39,7 +46,7 @@ def _build_retriever(device_id: Optional[str], room: Optional[str]):
 
 
 
-PROMPT_TEMPLATE = """You are a helpful assistant that helps users with their home appliances and furniture by answering questions based on their manuals.
+SYSTEM_MESSAGE = """You are a helpful assistant that helps users with their home appliances and furniture by answering questions based on their manuals.
 
 Your approach:
 1. UNDERSTAND THE USER'S INTENT - Users may phrase questions informally or use different terminology than the manual. Interpret what they're really asking.
@@ -64,12 +71,10 @@ Your approach:
    - Suggest reasonable next steps or general best practices
    - Only escalate to "contact manufacturer" if truly necessary
 
-Question: {question}
+6. USE CONVERSATION CONTEXT - If the user refers to previous messages (like "that", "it", "the problem I mentioned"), use the conversation history to understand what they're referring to.
 
 Context from manual:
 {context}
-
-Provide a helpful, practical answer that solves the user's problem:
 """
 
 
@@ -98,28 +103,99 @@ def _build_sources_from_docs(docs) -> List[Dict[str, Any]]:
     return sources
 
 
+def _get_conversation_messages(session_id: Optional[str], max_messages: int = 10) -> List:
+    """Get conversation history for a session as LangChain messages."""
+    if not session_id:
+        return []
+    
+    with _memory_lock:
+        if session_id not in _conversation_memory:
+            return []
+        
+        # Get recent messages (last max_messages pairs)
+        history = _conversation_memory[session_id][-max_messages:]
+        messages = []
+        
+        for role, content in history:
+            if role == "user":
+                messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                messages.append(AIMessage(content=content))
+        
+        return messages
+
+
+def _add_to_memory(session_id: Optional[str], role: str, content: str):
+    """Add a message to conversation memory."""
+    if not session_id:
+        return
+    
+    with _memory_lock:
+        _conversation_memory[session_id].append((role, content))
+        
+        # Limit memory size per session (keep last 20 message pairs = 40 messages)
+        max_messages = 40
+        if len(_conversation_memory[session_id]) > max_messages:
+            _conversation_memory[session_id] = _conversation_memory[session_id][-max_messages:]
+
+
+def clear_session_memory(session_id: Optional[str]):
+    """Clear conversation memory for a session."""
+    if not session_id:
+        return
+    
+    with _memory_lock:
+        if session_id in _conversation_memory:
+            del _conversation_memory[session_id]
+
+
 def answer_question(
     question: str,
     device_id: Optional[str] = None,
     room: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Run a RAG query and return answer plus structured sources."""
+    """Run a RAG query with conversation memory and return answer plus structured sources.
+    
+    Args:
+        question: The user's question
+        device_id: Optional device ID to filter manuals
+        room: Optional room name to filter manuals
+        session_id: Optional session ID for conversation memory
+    
+    Returns:
+        Dictionary with 'answer' and 'sources' keys
+    """
     retriever = _build_retriever(device_id=device_id, room=room)
     llm = ChatOllama(model=settings.LLM_MODEL_NAME)
-    prompt = PromptTemplate(
-        template=PROMPT_TEMPLATE,
-        input_variables=["context", "question"],
-    )
     
     # Retrieve documents once and cache for both context and sources
     source_docs = retriever.invoke(question)
     context = _format_docs(source_docs)
     
-    # Build and run the chain with pre-retrieved context
-    chain = prompt | llm | StrOutputParser()
-    answer: str = chain.invoke({"context": context, "question": question})
+    # Get conversation history
+    chat_history = _get_conversation_messages(session_id)
     
-    # Build sources from the same retrieved documents
+    # Build prompt with system message, history, and current question
+    system_msg = SystemMessage(content=SYSTEM_MESSAGE.format(context=context))
+    messages = [system_msg]
+    
+    # Add conversation history
+    if chat_history:
+        messages.extend(chat_history)
+    
+    # Add current question
+    messages.append(HumanMessage(content=question))
+    
+    # Generate response
+    response = llm.invoke(messages)
+    answer = response.content if hasattr(response, 'content') else str(response)
+    
+    # Add to memory
+    _add_to_memory(session_id, "user", question)
+    _add_to_memory(session_id, "assistant", answer)
+    
+    # Build sources from the retrieved documents
     sources = _build_sources_from_docs(source_docs)
 
     return {"answer": answer, "sources": sources}

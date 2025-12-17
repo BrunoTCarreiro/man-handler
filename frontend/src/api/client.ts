@@ -297,6 +297,17 @@ export async function sendMessage(
   return res.json();
 }
 
+export async function clearChatMemory(sessionId: string): Promise<void> {
+  const res = await fetch(apiUrl(`/chat/clear/${sessionId}`), {
+    method: "POST",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Clear memory failed: ${res.status} ${text}`);
+  }
+}
+
 // NOTE: legacy `uploadManual()` removed (unused in current UX).
 
 

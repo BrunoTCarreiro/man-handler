@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from . import manual_processing, settings
 from .device_catalog import Device, get_device, list_rooms, load_devices, save_devices
 from .ingest import add_device_manuals, remove_device_from_vectorstore, replace_device_manuals
-from .rag_pipeline import answer_question
+from .rag_pipeline import answer_question, clear_session_memory
 from .ocr_extraction import extract_pdf_with_ocr
 from extract_manual import generate_reference_md
 from .translation import detect_language
@@ -755,6 +755,13 @@ def get_device_file(device_id: str, file_path: str):
     return FileResponse(full_path)
 
 
+@app.post("/chat/clear/{session_id}")
+def clear_chat_memory(session_id: str) -> dict:
+    """Clear conversation memory for a specific session."""
+    clear_session_memory(session_id)
+    return {"status": "ok", "message": f"Conversation memory cleared for session {session_id}"}
+
+
 @app.post("/reset")
 def reset_workspace() -> dict:
     """Reset generated artifacts (destructive)."""
@@ -789,6 +796,7 @@ def chat(request: ChatRequest) -> ChatResponse:
         question=request.message,
         device_id=request.device_id,
         room=request.room,
+        session_id=request.session_id,
     )
     sources = [Source(**s) for s in result["sources"]]
     return ChatResponse(answer=result["answer"], sources=sources)
