@@ -1,0 +1,118 @@
+.status-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.status-loading {
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.status-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.status-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.status-value {
+  font-size: 0.85rem;
+  color: #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-model {
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  color: #a78bfa;
+  font-size: 0.8rem;
+}
+
+.status-version {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-left: 2px;
+}
+
+/* Connection status */
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 2px;
+}
+
+.status-connected {
+  color: #34d399;
+}
+
+.status-connected .status-indicator {
+  background-color: #34d399;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-disconnected {
+  color: #ef4444;
+}
+
+.status-disconnected .status-indicator {
+  background-color: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.status-separator {
+  width: 1px;
+  height: 32px;
+  background: linear-gradient(to bottom, transparent, rgba(148, 163, 184, 0.2), transparent);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .status-header {
+    gap: 16px;
+  }
+
+  .status-item {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 120px;
+  }
+
+  .status-separator {
+    display: none;
+  }
+
+  .status-label {
+    font-size: 0.65rem;
+  }
+
+  .status-value {
+    font-size: 0.8rem;
+  }
+
+  .status-model {
+    font-size: 0.75rem;
+  }
+}
+

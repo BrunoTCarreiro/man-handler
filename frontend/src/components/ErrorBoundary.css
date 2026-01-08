@@ -1,6 +1,5 @@
 .error-boundary {
   min-height: 100vh;
-  min-height: 100dvh; /* Dynamic viewport height - accounts for mobile browser UI */
   display: flex;
   align-items: center;
   justify-content: center;

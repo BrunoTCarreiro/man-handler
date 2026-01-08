@@ -7,14 +7,19 @@ import {
   deleteDevice,
   updateDevice,
   renameRoom,
+  getSetupStatus,
 } from "./api/client";
 import { getErrorMessage } from "./api/errors";
 import { ManualOnboardingModal } from "./components/ManualOnboardingModal";
 import { EditDeviceModal } from "./components/EditDeviceModal";
-import { SettingsPanel } from "./components/SettingsPanel";
 import { ViewManualModal } from "./components/ViewManualModal";
+import { FirstTimeSetupWizard } from "./components/FirstTimeSetupWizard";
+import { Sidebar } from "./components/Sidebar";
+import { ManualsView } from "./components/ManualsView";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { ToastHost, type Toast } from "./components/ToastHost";
 import { ConfirmDialog, type ConfirmDialogState } from "./components/ConfirmDialog";
+import { StatusHeader, refreshOllamaStatus } from "./components/StatusHeader";
 
 type MessageRole = "user" | "assistant";
 
@@ -29,6 +34,7 @@ function randomSessionId() {
 }
 
 export function App() {
+  const [setupCompleted, setSetupCompleted] = useState<boolean | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -37,7 +43,6 @@ export function App() {
   const [sessionId] = useState(() => randomSessionId());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [deviceToEdit, setDeviceToEdit] = useState<Device | null>(null);
   const [deviceToReplace, setDeviceToReplace] = useState<Device | null>(null);
@@ -53,19 +58,59 @@ export function App() {
     variant: "default",
   });
   const [confirmResolver, setConfirmResolver] = useState<((value: boolean) => void) | null>(null);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth > 768;
+    }
+    return true;
+  });
+  const [activeSection, setActiveSection] = useState<"ask" | "manuals" | "settings">("ask");
+  const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
+  
+  // Check setup status on mount
   useEffect(() => {
     (async () => {
       try {
-        const d = await getDevices();
-        setDevices(d);
-        if (d.length > 0) {
-          setSelectedDeviceId(d[0].id);
-        }
+        const status = await getSetupStatus();
+        setSetupCompleted(status.setup_completed);
       } catch (err) {
-        console.error(err);
+        console.error("Failed to check setup status:", err);
+        // Assume setup is needed if check fails
+        setSetupCompleted(false);
       }
     })();
   }, []);
+
+  // Load devices once setup is completed
+  useEffect(() => {
+    if (setupCompleted === true) {
+      (async () => {
+        try {
+          const d = await getDevices();
+          setDevices(d);
+          if (d.length > 0) {
+            setSelectedDeviceId(d[0].id);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      })();
+    }
+  }, [setupCompleted]);
+
+  // Handle window resize for sidebar
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768 && !isSidebarExpanded) {
+        setIsSidebarExpanded(true);
+      } else if (window.innerWidth <= 768 && isSidebarExpanded) {
+        setIsSidebarExpanded(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isSidebarExpanded]);
 
   async function refreshDevices() {
     const updated = await getDevices();
@@ -97,6 +142,9 @@ export function App() {
   async function handleSend() {
     const text = input.trim();
     if (!text || isLoading) return;
+
+    // Check Ollama status before sending message
+    await refreshOllamaStatus();
 
     const userMessage: Message = { role: "user", content: text };
     setMessages((prev) => [...prev, userMessage]);
@@ -247,6 +295,42 @@ export function App() {
     }
   }
 
+  const handleSetupComplete = async () => {
+    setSetupCompleted(true);
+    // Load devices after setup
+    try {
+      const d = await getDevices();
+      setDevices(d);
+      if (d.length > 0) {
+        setSelectedDeviceId(d[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to load devices after setup:", err);
+    }
+  };
+
+  // Show loading state while checking setup
+  if (setupCompleted === null) {
+    return (
+      <div className="app-root">
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          height: "100vh",
+          color: "#9ca3af"
+        }}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  // Show setup wizard if setup not completed
+  if (!setupCompleted) {
+    return <FirstTimeSetupWizard onComplete={handleSetupComplete} />;
+  }
+
   return (
     <div className="app-root">
       <ToastHost toasts={toasts} onDismiss={dismissToast} />
@@ -263,34 +347,42 @@ export function App() {
           setConfirmResolver(null);
         }}
       />
-      <header className="top-bar">
-        <div>
-          <h1>Home Manual Assistant</h1>
-          <p className="subtitle">
-            Ask questions about your appliances, tools, and gadgets using local manuals.
-          </p>
-        </div>
-        <div className="header-actions">
-          <div className="action-buttons">
+      <Sidebar
+        isExpanded={isSidebarExpanded}
+        activeSection={activeSection}
+        onToggle={() => setIsSidebarExpanded(!isSidebarExpanded)}
+        onSectionChange={(section) => {
+          setActiveSection(section);
+          // Auto-close sidebar on mobile when selecting a section
+          if (typeof window !== "undefined" && window.innerWidth <= 768) {
+            setIsSidebarExpanded(false);
+          }
+        }}
+        onClose={() => setIsSidebarExpanded(false)}
+      />
+      <div 
+        className="app-content" 
+        style={{ 
+          marginLeft: isSidebarExpanded ? "280px" : "80px",
+          width: isSidebarExpanded ? "calc(100% - 280px)" : "calc(100% - 80px)"
+        }}
+      >
+        <header className="top-bar">
+          <div className="header-left">
             <button
-              className="add-manual-button"
-              onClick={() => setIsModalOpen(true)}
+              className="mobile-menu-button"
+              onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+              aria-label="Toggle menu"
             >
-              Add Manual
+              ☰
             </button>
-            <button
-              className="settings-button"
-              onClick={() => setIsSettingsPanelOpen(true)}
-              title="Settings"
-            >
-              Settings
-            </button>
+            <StatusHeader />
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="layout">
-        <section className="chat-panel">
+        <main className="layout">
+          {activeSection === "ask" && (
+            <section className="chat-panel">
           <div className="messages">
             {messages.length === 0 && (
               <div className="empty-state">
@@ -373,7 +465,28 @@ export function App() {
             </button>
           </div>
         </section>
-      </main>
+          )}
+          {activeSection === "manuals" && (
+            <ManualsView
+              devices={devices}
+              onEdit={handleEditDevice}
+              onReplace={handleReplaceDevice}
+              onDelete={handleDeleteDevice}
+              onView={handleViewDevice}
+              onRenameRoom={handleRenameRoom}
+              onAddManual={() => setIsModalOpen(true)}
+            />
+          )}
+          {activeSection === "settings" && (
+            <SettingsPanel
+              isOpen={true}
+              onClose={() => setActiveSection("ask")}
+              onReset={handleReset}
+              isResetting={isResetting}
+            />
+          )}
+        </main>
+      </div>
 
       <ManualOnboardingModal
         isOpen={isModalOpen}
@@ -392,18 +505,6 @@ export function App() {
           setDeviceToEdit(null);
         }}
         onSave={handleUpdateDevice}
-      />
-      <SettingsPanel
-        isOpen={isSettingsPanelOpen}
-        onClose={() => setIsSettingsPanelOpen(false)}
-        devices={devices}
-        onEdit={handleEditDevice}
-        onView={handleViewDevice}
-        onReplace={handleReplaceDevice}
-        onDelete={handleDeleteDevice}
-        onRenameRoom={handleRenameRoom}
-        onReset={handleReset}
-        isResetting={isResetting}
       />
       <ViewManualModal
         isOpen={isViewModalOpen}

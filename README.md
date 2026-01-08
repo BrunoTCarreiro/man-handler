@@ -93,7 +93,7 @@ start-services.bat          # localhost only
 start-services.bat network  # expose to network
 ```
 
-**macOS/Linux**
+**macOS/Linux
 
 ```bash
 chmod +x ./start-services.sh
@@ -189,6 +189,28 @@ VITE_API_BASE_URL=http://localhost:8000
 ---
 
 ### 4. Usage
+
+#### First-Time Setup
+
+On first launch (or if `data/config.json` doesn't exist), the app will guide you through initial setup:
+
+1. **Ollama Connection Check** - Verifies Ollama is running at `http://localhost:11434`
+2. **Model Selection** - Choose from available models:
+   - **LLM Model** (recommended: `mistral:instruct`) - For chat, translation, analysis
+   - **Embedding Model** (recommended: `bge-m3`) - For semantic search
+   - Auto-selects recommended models if available
+3. **Model Testing** (optional) - Verify models work before committing
+4. **Complete Setup** - Saves configuration to `data/config.json`
+
+**If no models are available:**
+- The wizard will show exact commands to pull required models:
+  ```bash
+  ollama pull mistral:instruct
+  ollama pull bge-m3
+  ```
+- Click "Refresh Models" after pulling
+
+**Note:** You can change models later in Settings → Model Configuration.
 
 #### Adding a Manual (4-Step Wizard)
 
@@ -325,6 +347,8 @@ See `docs/adr/` for all architectural decision records:
 - **ADR-010:** Markdown-first ingestion
 - **ADR-011:** Settings panel and device management
 - **ADR-012:** Actions dropdown and view manual feature
+- **ADR-013:** Code quality and centralized configuration
+- **ADR-014:** First-time setup wizard and configuration management
 
 **Key files:**
 - `backend/main.py` - FastAPI app, all endpoints

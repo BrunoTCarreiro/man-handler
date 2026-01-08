@@ -123,9 +123,10 @@ export async function translateManual(file: File): Promise<ManualTranslateRespon
   return res.json();
 }
 
-export async function processManual(file: File, signal?: AbortSignal): Promise<ManualProcessResponse> {
+export async function processManual(file: File, isEnglishManual: boolean = false, signal?: AbortSignal): Promise<ManualProcessResponse> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("is_english_manual", isEnglishManual ? "true" : "false");
 
   const res = await fetch(apiUrl("/manuals/process"), {
     method: "POST",
@@ -309,5 +310,138 @@ export async function clearChatMemory(sessionId: string): Promise<void> {
 }
 
 // NOTE: legacy `uploadManual()` removed (unused in current UX).
+
+// =============================================================================
+// Setup API
+// =============================================================================
+
+export type SetupStatusResponse = {
+  setup_completed: boolean;
+  ollama_status: {
+    status: string;
+    message: string;
+    version?: string;
+  };
+  current_config: {
+    llm_model: string;
+    embedding_model: string;
+    translation_model: string;
+  };
+};
+
+export type OllamaModel = {
+  name: string;
+  size: number;
+  modified: string;
+};
+
+export type OllamaModelsResponse = {
+  status: string;
+  llm_models: OllamaModel[];
+  embedding_models: OllamaModel[];
+  total: number;
+  message?: string;
+};
+
+export async function getSetupStatus(): Promise<SetupStatusResponse> {
+  const res = await fetch(apiUrl("/setup/status"));
+  if (!res.ok) {
+    throw new Error("Failed to get setup status");
+  }
+  return res.json();
+}
+
+export async function checkOllamaConnection(): Promise<{ status: string; message: string; version?: string }> {
+  const res = await fetch(apiUrl("/setup/ollama/connection"));
+  if (!res.ok) {
+    throw new Error("Failed to check Ollama connection");
+  }
+  return res.json();
+}
+
+export async function getOllamaModels(): Promise<OllamaModelsResponse> {
+  const res = await fetch(apiUrl("/setup/ollama/models"));
+  if (!res.ok) {
+    throw new Error("Failed to get Ollama models");
+  }
+  return res.json();
+}
+
+export async function testOllamaModel(modelName: string, modelType: "llm" | "embedding"): Promise<{ status: string; message: string }> {
+  const res = await fetch(apiUrl(`/setup/ollama/test-model?model_name=${encodeURIComponent(modelName)}&model_type=${modelType}`), {
+    method: "POST",
+  });
+  if (!res.ok) {
+    throw new Error("Failed to test model");
+  }
+  return res.json();
+}
+
+export async function completeSetup(llmModel: string, embeddingModel: string, translationModel?: string): Promise<{ status: string; message: string }> {
+  const res = await fetch(apiUrl("/setup/complete"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      llm_model: llmModel,
+      embedding_model: embeddingModel,
+      translation_model: translationModel,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Setup completion failed: ${text || res.status}`);
+  }
+
+  return res.json();
+}
+
+export type ConfigData = {
+  setup_completed: boolean;
+  ollama_models: {
+    llm: string;
+    embedding: string;
+    translation: string;
+  };
+  rag_params: {
+    top_k: number;
+    chunk_size: number;
+    chunk_overlap: number;
+  };
+};
+
+export async function getConfig(): Promise<ConfigData> {
+  const res = await fetch(apiUrl("/setup/config"));
+  if (!res.ok) {
+    throw new Error("Failed to get configuration");
+  }
+  const data = await res.json();
+  return data.config;
+}
+
+export type UpdateConfigParams = {
+  llm_model?: string;
+  embedding_model?: string;
+  translation_model?: string;
+  top_k?: number;
+  chunk_size?: number;
+  chunk_overlap?: number;
+};
+
+export async function updateConfig(params: UpdateConfigParams): Promise<ConfigData> {
+  const res = await fetch(apiUrl("/setup/config"), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Config update failed: ${text || res.status}`);
+  }
+
+  const data = await res.json();
+  return data.config;
+}
 
 

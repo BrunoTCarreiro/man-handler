@@ -1,0 +1,313 @@
+.model-config-section {
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  padding-top: 24px;
+}
+
+.config-error {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.config-success {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.config-item {
+  margin-bottom: 20px;
+}
+
+.config-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.config-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.4);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.config-value {
+  color: #e5e7eb;
+  font-size: 0.95rem;
+  font-family: "Consolas", "Monaco", monospace;
+}
+
+.config-edit-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.config-edit-btn:hover {
+  border-color: #06b6d4;
+  color: #e5e7eb;
+  background: rgba(6, 182, 212, 0.1);
+}
+
+.config-edit-box {
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.config-select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: #020617;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.config-select:focus {
+  outline: none;
+  border-color: #06b6d4;
+}
+
+.config-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.config-test-btn,
+.config-save-btn,
+.config-cancel-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.config-test-btn {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #9ca3af;
+}
+
+.config-test-btn:hover:not(:disabled) {
+  border-color: #06b6d4;
+  color: #e5e7eb;
+  background: rgba(6, 182, 212, 0.1);
+}
+
+.config-save-btn {
+  background: linear-gradient(to right, #10b981, #06b6d4);
+  color: white;
+}
+
+.config-save-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.config-save-btn:disabled,
+.config-test-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.config-cancel-btn {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #9ca3af;
+}
+
+.config-cancel-btn:hover {
+  border-color: #9ca3af;
+  color: #e5e7eb;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.test-result-inline {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.test-result-inline.success {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.test-result-inline.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.loading-text,
+.loading-text-small {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.loading-text-small {
+  font-size: 0.9rem;
+  margin: 8px 0;
+}
+
+.no-models-text {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  margin: 8px 0;
+}
+
+.error-text {
+  color: #fca5a5;
+  margin: 12px 0;
+}
+
+.advanced-toggle {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(2, 6, 23, 0.4);
+  color: #e5e7eb;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.advanced-toggle:hover {
+  border-color: #06b6d4;
+  background: rgba(6, 182, 212, 0.05);
+}
+
+.advanced-settings {
+  margin-top: 16px;
+  padding: 20px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.rag-params {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.rag-param {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rag-param label {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-weight: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.param-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: normal;
+}
+
+.rag-param input {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: #020617;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+}
+
+.rag-param input:focus {
+  outline: none;
+  border-color: #06b6d4;
+}
+
+.rag-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.reset-to-recommended-btn {
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 16px;
+}
+
+.reset-to-recommended-btn:hover:not(:disabled) {
+  border-color: #06b6d4;
+  color: #e5e7eb;
+  background: rgba(6, 182, 212, 0.1);
+}
+
+.reset-to-recommended-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .rag-params {
+    grid-template-columns: 1fr;
+  }
+
+  .config-actions {
+    flex-direction: column;
+  }
+
+  .config-test-btn,
+  .config-save-btn,
+  .config-cancel-btn {
+    width: 100%;
+  }
+}
+
+
+
+

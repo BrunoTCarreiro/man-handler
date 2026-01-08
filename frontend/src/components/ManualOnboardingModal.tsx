@@ -7,6 +7,7 @@ import type {
 } from "../api/client";
 import { analyzeManual, processManual, commitManual, getDevices, getProcessingStatus, cancelProcessing, deleteDevice } from "../api/client";
 import { getErrorMessage } from "../api/errors";
+import { refreshOllamaStatus } from "./StatusHeader";
 import "./ManualOnboardingModal.css";
 
 interface ManualOnboardingModalProps {
@@ -50,6 +51,7 @@ export function ManualOnboardingModal({
   const [currentToken, setCurrentToken] = useState<string | null>(null);
   const processLogRef = useRef<HTMLDivElement | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isEnglishManual, setIsEnglishManual] = useState(false);
 
   // Auto-scroll to latest log entry
   useEffect(() => {
@@ -79,6 +81,7 @@ export function ManualOnboardingModal({
     setIsCommitting(false);
     setIsUploadComplete(false);
     setCurrentToken(null);
+    setIsEnglishManual(false);
     stopStatusPolling();
   };
 
@@ -173,8 +176,11 @@ export function ManualOnboardingModal({
     setCommitStatus(null);
 
     try {
+      // Check Ollama status before starting processing
+      await refreshOllamaStatus();
+      
       // Call process endpoint - it returns immediately with a token
-      const response = await processManual(manualFile);
+      const response = await processManual(manualFile, isEnglishManual);
       const token = response.token;
       setCurrentToken(token);
       
@@ -412,6 +418,17 @@ export function ManualOnboardingModal({
             <p className="step-description">
               Extract English content. Non-English manuals will be auto-translated.
             </p>
+            <div className="process-options">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={isEnglishManual}
+                  onChange={(e) => setIsEnglishManual(e.target.checked)}
+                  disabled={isProcessing}
+                />
+                <span>English manual (skip language detection, process entire manual)</span>
+              </label>
+            </div>
             <div className="process-actions">
               <button
                 type="button"

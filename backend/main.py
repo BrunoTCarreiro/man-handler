@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import shutil
 import subprocess
 import sys
@@ -8,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, FileResponse
 from pydantic import BaseModel, Field
@@ -21,6 +22,12 @@ from .ocr_extraction import extract_pdf_with_ocr
 from extract_manual import generate_reference_md
 from .translation import detect_language
 from .language_detection import detect_and_select_language_section, get_language_name
+from .config_manager import (
+    check_ollama_connection,
+    get_config,
+    list_ollama_models,
+    test_model,
+)
 
 # Global dict to store processing status for polling
 processing_status: Dict[str, Dict] = {}
@@ -127,7 +134,38 @@ class ManualCommitResponse(BaseModel):
     device: Device
 
 
+class SetupStatusResponse(BaseModel):
+    setup_completed: bool
+    ollama_status: dict
+    current_config: dict
+
+
+class UpdateModelsRequest(BaseModel):
+    llm_model: Optional[str] = None
+    embedding_model: Optional[str] = None
+    translation_model: Optional[str] = None
+
+
+class CompleteSetupRequest(BaseModel):
+    llm_model: str
+    embedding_model: str
+    translation_model: Optional[str] = None
+
+
+class UpdateConfigRequest(BaseModel):
+    llm_model: Optional[str] = None
+    embedding_model: Optional[str] = None
+    translation_model: Optional[str] = None
+    top_k: Optional[int] = None
+    chunk_size: Optional[int] = None
+    chunk_overlap: Optional[int] = None
+
+
 app = FastAPI(title="Home Manual Assistant")
+
+# Log CORS configuration
+logger_init = logging.getLogger("backend.main")
+logger_init.info("CORS Origins: %s", settings.CORS_ORIGINS)
 
 app.add_middleware(
     CORSMiddleware,
@@ -135,6 +173,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Get logger from settings
@@ -144,6 +183,128 @@ logger = settings.logger
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+# =============================================================================
+# Setup Endpoints
+# =============================================================================
+
+@app.get("/setup/status")
+def get_setup_status() -> SetupStatusResponse:
+    """Get current setup status and configuration."""
+    config = get_config()
+    ollama_status = check_ollama_connection()
+    
+    return SetupStatusResponse(
+        setup_completed=config.is_setup_completed(),
+        ollama_status=ollama_status,
+        current_config={
+            "llm_model": config.get_llm_model(),
+            "embedding_model": config.get_embedding_model(),
+            "translation_model": config.get_translation_model(),
+        },
+    )
+
+
+@app.get("/setup/ollama/connection")
+def check_ollama() -> dict:
+    """Check if Ollama is running and accessible."""
+    return check_ollama_connection()
+
+
+@app.get("/setup/ollama/models")
+def get_ollama_models() -> dict:
+    """List all available Ollama models."""
+    return list_ollama_models()
+
+
+@app.post("/setup/ollama/test-model")
+def test_ollama_model(model_name: str, model_type: str = "llm") -> dict:
+    """Test if a specific model is working."""
+    return test_model(model_name, model_type)
+
+
+@app.post("/setup/complete")
+def complete_setup(request: CompleteSetupRequest) -> dict:
+    """Complete the first-time setup with selected models."""
+    config = get_config()
+    
+    # Update model configuration
+    config.update_models(
+        llm=request.llm_model,
+        embedding=request.embedding_model,
+        translation=request.translation_model or request.llm_model,
+    )
+    
+    # Mark setup as completed
+    config.mark_setup_completed()
+    
+    logger.info(
+        "Setup completed with LLM: %s, Embedding: %s, Translation: %s",
+        request.llm_model,
+        request.embedding_model,
+        request.translation_model or request.llm_model,
+    )
+    
+    return {
+        "status": "success",
+        "message": "Setup completed successfully",
+        "config": {
+            "llm_model": config.get_llm_model(),
+            "embedding_model": config.get_embedding_model(),
+            "translation_model": config.get_translation_model(),
+        },
+    }
+
+
+@app.get("/setup/config")
+def get_setup_config() -> dict:
+    """Get the current configuration."""
+    config = get_config()
+    return {
+        "status": "success",
+        "config": config.get_config_dict(),
+    }
+
+
+@app.patch("/setup/config")
+def update_setup_config(request: UpdateConfigRequest) -> dict:
+    """Update configuration settings."""
+    config = get_config()
+    
+    # Update models if provided
+    if request.llm_model or request.embedding_model or request.translation_model:
+        config.update_models(
+            llm=request.llm_model,
+            embedding=request.embedding_model,
+            translation=request.translation_model,
+        )
+        logger.info(
+            "Updated models: LLM=%s, Embedding=%s, Translation=%s",
+            request.llm_model or "unchanged",
+            request.embedding_model or "unchanged",
+            request.translation_model or "unchanged",
+        )
+    
+    # Update RAG params if provided
+    if request.top_k is not None or request.chunk_size is not None or request.chunk_overlap is not None:
+        config.update_rag_params(
+            top_k=request.top_k,
+            chunk_size=request.chunk_size,
+            chunk_overlap=request.chunk_overlap,
+        )
+        logger.info(
+            "Updated RAG params: TOP_K=%s, CHUNK_SIZE=%s, CHUNK_OVERLAP=%s",
+            request.top_k if request.top_k is not None else "unchanged",
+            request.chunk_size if request.chunk_size is not None else "unchanged",
+            request.chunk_overlap if request.chunk_overlap is not None else "unchanged",
+        )
+    
+    return {
+        "status": "success",
+        "message": "Configuration updated successfully",
+        "config": config.get_config_dict(),
+    }
 
 
 @app.post("/restart")
@@ -246,7 +407,7 @@ async def translate_manual(file: UploadFile = File(...)) -> ManualTranslateRespo
     )
 
 
-def process_manual_background(token: str, pdf_path: Path, images_dir: Path, reference_md: Path):
+def process_manual_background(token: str, pdf_path: Path, images_dir: Path, reference_md: Path, is_english_manual: bool = False):
     """Background task to process manual with cancellation support."""
     
     def add_log(message: str) -> None:
@@ -266,34 +427,40 @@ def process_manual_background(token: str, pdf_path: Path, images_dir: Path, refe
         add_log(log_msg)
     
     try:
-        # Pre-scan for language sections
-        add_log("[INFO] Scanning PDF for language sections...")
-        with status_lock:
-            if token in processing_status:
-                processing_status[token]["stage"] = "language_scan"
-        
-        section_info = detect_and_select_language_section(pdf_path, sample_interval=2)
-        
-        if check_cancelled():
-            add_log("[INFO] Processing cancelled by user")
-            with status_lock:
-                if token in processing_status:
-                    processing_status[token]["status"] = "cancelled"
-                    processing_status[token]["stage"] = "cancelled"
-            return
-        
         # Determine extraction parameters
         start_page = 0
         end_page = None
         detected_language = "unknown"
         
-        if section_info:
-            detected_language, start_page, end_page = section_info
-            lang_name = get_language_name(detected_language)
-            add_log(f"[OK] Found {lang_name} section (pages {start_page + 1}-{end_page + 1})")
-            add_log(f"[INFO] Will extract {end_page - start_page + 1} pages instead of entire PDF")
+        if is_english_manual:
+            # Skip language detection, assume English and process entire manual
+            add_log("[INFO] English manual flag set, skipping language detection")
+            add_log("[INFO] Will process entire manual as English")
+            detected_language = "en"
         else:
-            add_log("[INFO] No clear language sections detected, will extract all pages")
+            # Pre-scan for language sections
+            add_log("[INFO] Scanning PDF for language sections...")
+            with status_lock:
+                if token in processing_status:
+                    processing_status[token]["stage"] = "language_scan"
+            
+            section_info = detect_and_select_language_section(pdf_path, sample_interval=2)
+            
+            if check_cancelled():
+                add_log("[INFO] Processing cancelled by user")
+                with status_lock:
+                    if token in processing_status:
+                        processing_status[token]["status"] = "cancelled"
+                        processing_status[token]["stage"] = "cancelled"
+                return
+            
+            if section_info:
+                detected_language, start_page, end_page = section_info
+                lang_name = get_language_name(detected_language)
+                add_log(f"[OK] Found {lang_name} section (pages {start_page + 1}-{end_page + 1})")
+                add_log(f"[INFO] Will extract {end_page - start_page + 1} pages instead of entire PDF")
+            else:
+                add_log("[INFO] No clear language sections detected, will extract all pages")
         
         # OCR extract pages + images (only selected section)
         add_log("[INFO] Starting OCR extraction...")
@@ -417,7 +584,8 @@ def process_manual_background(token: str, pdf_path: Path, images_dir: Path, refe
 @app.post("/manuals/process", response_model=ManualProcessResponse)
 async def process_manual(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    is_english_manual: bool = Form(False)
 ) -> ManualProcessResponse:
     """Unified flow using the OCR pipeline (extract_manual): OCR + detect + translate as needed.
     
@@ -454,7 +622,8 @@ async def process_manual(
         token,
         pdf_path,
         images_dir,
-        reference_md
+        reference_md,
+        is_english_manual
     )
     
     # Return immediately with token
