@@ -382,18 +382,3 @@ See `docs/adr/` for all architectural decision records:
 **Cancel button doesn't work**  
 → It waits for current page to finish (~6s). Check logs for "[INFO] Processing cancelled at page X/Y".
 
----
-
-### 8. Sharing with Others
-
-```bash
-# Create zip (respects .gitignore)
-git archive --format=zip --output home-manual-assistant.zip HEAD
-```
-
-Recipients should:
-1. Extract zip
-2. Follow setup instructions (sections 1-3)
-3. Upload their own manuals via UI
-4. No manual data setup required!
-
