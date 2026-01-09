@@ -12,6 +12,7 @@ import json
 import logging
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 import requests
@@ -22,6 +23,10 @@ logger = logging.getLogger("backend.config_manager")
 
 CONFIG_FILE = settings.DATA_DIR / "config.json"
 OLLAMA_BASE_URL = "http://localhost:11434"
+
+# Restart rate limiting
+_last_restart_ts: Optional[float] = None
+RESTART_MIN_INTERVAL_SECONDS = 20
 
 
 class SetupConfig:
@@ -312,13 +317,41 @@ def test_model(model_name: str, model_type: str = "llm", model_purpose: str = "g
 
 def restart_ollama() -> dict:
     """
-    Attempt to restart Ollama service.
+    Attempt to restart Ollama service with safety checks.
+    
+    Safety features:
+    - Checks if Ollama is already running (no-op if connected)
+    - Rate-limits restart attempts (20s minimum interval)
+    - Returns structured status for better UI feedback
     
     Returns:
-        dict with status and message
+        dict with status ("already_running" | "rate_limited" | "started" | "error") and message
     """
+    global _last_restart_ts
+    
     try:
-        logger.info("Attempting to restart Ollama service...")
+        # Check if Ollama is already running
+        connection_status = check_ollama_connection()
+        if connection_status.get("status") == "connected":
+            logger.info("Ollama is already running, restart not needed")
+            return {
+                "status": "already_running",
+                "message": "Ollama is already running and connected.",
+            }
+        
+        # Check rate limit
+        now = time.time()
+        if _last_restart_ts is not None:
+            time_since_last = now - _last_restart_ts
+            if time_since_last < RESTART_MIN_INTERVAL_SECONDS:
+                remaining = RESTART_MIN_INTERVAL_SECONDS - time_since_last
+                logger.warning("Restart rate-limited, %ds remaining", remaining)
+                return {
+                    "status": "rate_limited",
+                    "message": f"Please wait {int(remaining)}s before restarting again.",
+                }
+        
+        logger.info("Starting Ollama service...")
         
         # Platform-specific commands
         if sys.platform == "win32":
@@ -338,9 +371,12 @@ def restart_ollama() -> dict:
                 start_new_session=True
             )
         
+        # Update rate limit timestamp
+        _last_restart_ts = now
+        
         logger.info("Ollama restart command issued successfully")
         return {
-            "status": "success",
+            "status": "started",
             "message": "Ollama restart initiated. Please wait a few seconds for it to start.",
         }
     

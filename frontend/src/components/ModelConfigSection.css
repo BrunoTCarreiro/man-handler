@@ -175,6 +175,99 @@
   color: #ef4444;
 }
 
+/* Block-style test results for detailed output */
+.test-result-block {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.test-result-block.success {
+  background-color: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.test-result-block.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.test-result-block pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: inherit;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+}
+
+/* Custom test input sections */
+.test-input-section {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.test-input-label {
+  display: block;
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin-bottom: 0.5rem;
+}
+
+.test-input-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  color: #f3f4f6;
+  font-family: inherit;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.test-input-textarea:focus {
+  outline: none;
+  border-color: #8b5cf6;
+}
+
+.test-input-file {
+  width: 100%;
+  padding: 0.5rem;
+  background-color: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  color: #f3f4f6;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.test-input-file::-webkit-file-upload-button {
+  background-color: #374151;
+  border: none;
+  color: #f3f4f6;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 1rem;
+}
+
+.test-input-file::-webkit-file-upload-button:hover {
+  background-color: #4b5563;
+}
+
+.file-preview {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: #374151;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
 .loading-text,
 .loading-text-small {
   color: #9ca3af;

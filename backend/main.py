@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, FileResponse
 from pydantic import BaseModel, Field
@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from . import manual_processing, settings
 from .device_catalog import Device, get_device, list_rooms, load_devices, save_devices
 from .ingest import add_device_manuals, remove_device_from_vectorstore, replace_device_manuals
-from .rag_pipeline import answer_question, clear_session_memory
+from .rag_pipeline import answer_question, clear_session_memory, reload_vectorstore
 from .ocr_extraction import extract_pdf_with_ocr
 from extract_manual import generate_reference_md
 from .translation import detect_language
@@ -225,9 +225,101 @@ def test_ollama_model(model_name: str, model_type: str = "llm", model_purpose: s
     return test_model(model_name, model_type, model_purpose)
 
 
+class TranslationTestRequest(BaseModel):
+    text: str
+    source_lang: Optional[str] = None
+
+
+@app.post("/setup/translation/test")
+def test_translation(request: TranslationTestRequest) -> dict:
+    """Test translation with custom text using the actual translation pipeline.
+    
+    This validates both the translation prompt and post-processing cleanup.
+    """
+    from .translation import translate_text
+    
+    try:
+        translated = translate_text(
+            text=request.text,
+            target_lang="English",
+            source_lang=request.source_lang,
+        )
+        
+        return {
+            "status": "success",
+            "input": request.text,
+            "output": translated,
+            "source_lang": request.source_lang or "auto-detected",
+        }
+    except Exception as e:
+        logger.error("Translation test failed: %s", e)
+        return {
+            "status": "error",
+            "message": str(e),
+        }
+
+
+@app.post("/setup/ocr/test")
+async def test_ocr(file: UploadFile = File(...)) -> dict:
+    """Test OCR with uploaded image using the actual OCR pipeline.
+    
+    This validates the real OCR path with image input.
+    """
+    import base64
+    import ollama
+    
+    try:
+        # Read and encode image
+        image_bytes = await file.read()
+        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        
+        # Run OCR using the actual model
+        response = ollama.chat(
+            model="deepseek-ocr:3b",
+            messages=[
+                {
+                    "role": "user",
+                    "content": "<|grounding|>Convert the document to markdown.",
+                    "images": [image_b64],
+                }
+            ],
+            options={
+                "temperature": 0.1,
+            },
+        )
+        
+        extracted_text = response["message"]["content"]
+        
+        return {
+            "status": "success",
+            "input": f"Image: {file.filename}",
+            "output": extracted_text[:500] + ("..." if len(extracted_text) > 500 else ""),
+            "full_output": extracted_text,
+        }
+    except Exception as e:
+        logger.error("OCR test failed: %s", e)
+        return {
+            "status": "error",
+            "message": str(e),
+        }
+
+
 @app.post("/setup/ollama/restart")
-def restart_ollama_service() -> dict:
-    """Restart the Ollama service."""
+def restart_ollama_service(request: Request) -> dict:
+    """Restart the Ollama service.
+    
+    Security: When network-exposed, only localhost can restart Ollama.
+    """
+    # Restrict restart to localhost when network-exposed
+    if settings.EXPOSE_NETWORK:
+        client_host = request.client.host if request.client else None
+        if client_host not in ("127.0.0.1", "::1", "localhost"):
+            logger.warning("Restart attempt blocked from non-localhost: %s", client_host)
+            raise HTTPException(
+                status_code=403,
+                detail="Ollama restart is only available from localhost when network access is enabled."
+            )
+    
     return restart_ollama()
 
 
@@ -279,8 +371,14 @@ def update_setup_config(request: UpdateConfigRequest) -> dict:
     """Update configuration settings."""
     config = get_config()
     
+    # Track if embedding model changed (requires vectorstore reload)
+    embedding_changed = False
+    
     # Update models if provided
     if request.llm_model or request.embedding_model or request.translation_model:
+        if request.embedding_model:
+            embedding_changed = True
+        
         config.update_models(
             llm=request.llm_model,
             embedding=request.embedding_model,
@@ -292,6 +390,11 @@ def update_setup_config(request: UpdateConfigRequest) -> dict:
             request.embedding_model or "unchanged",
             request.translation_model or "unchanged",
         )
+    
+    # Reload vectorstore if embedding model changed
+    if embedding_changed:
+        logger.info("Embedding model changed, reloading vectorstore cache")
+        reload_vectorstore()
     
     # Update RAG params if provided
     if request.top_k is not None or request.chunk_size is not None or request.chunk_overlap is not None:
@@ -944,6 +1047,9 @@ def reset_workspace() -> dict:
     # Clear processing status dict to avoid stale data
     global processing_status
     processing_status.clear()
+    
+    # Clear vectorstore cache since DB will be rebuilt
+    reload_vectorstore()
     
     root = Path(__file__).resolve().parent.parent
     script = root / "tools" / "reset_workspace.py"

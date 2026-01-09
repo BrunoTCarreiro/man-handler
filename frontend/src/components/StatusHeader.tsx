@@ -52,13 +52,25 @@ export function StatusHeader() {
     setIsRestarting(true);
     try {
       const result = await restartOllama();
-      console.log(result.message);
       
-      // Wait 3 seconds before checking status
-      setTimeout(() => {
-        loadStatus();
+      // Handle different status responses
+      if (result.status === "already_running") {
+        // Ollama is already running, just refresh status
+        await loadStatus();
         setIsRestarting(false);
-      }, 3000);
+      } else if (result.status === "rate_limited") {
+        // Rate limited, show message and don't wait
+        setIsRestarting(false);
+      } else if (result.status === "started") {
+        // Successfully started, wait for it to come online
+        setTimeout(() => {
+          loadStatus();
+          setIsRestarting(false);
+        }, 3000);
+      } else {
+        // Error case
+        setIsRestarting(false);
+      }
     } catch (err) {
       console.error("Failed to restart Ollama:", err);
       setIsRestarting(false);
@@ -114,6 +126,15 @@ export function StatusHeader() {
         <div 
           className={`status-value ${isConnected ? "status-connected" : "status-disconnected"} ${!isConnected ? "status-clickable" : ""}`}
           onClick={!isConnected ? handleRestartOllama : undefined}
+          role={!isConnected ? "button" : undefined}
+          tabIndex={!isConnected ? 0 : undefined}
+          onKeyDown={!isConnected ? (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleRestartOllama();
+            }
+          } : undefined}
+          aria-label={!isConnected ? "Click to restart Ollama" : undefined}
           title={!isConnected ? "Click to restart Ollama" : undefined}
         >
           <span className="status-indicator"></span>

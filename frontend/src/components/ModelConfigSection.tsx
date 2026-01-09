@@ -3,6 +3,8 @@ import {
   getConfig,
   getOllamaModels,
   testOllamaModel,
+  testTranslation,
+  testOCR,
   updateConfig,
   type ConfigData,
   type OllamaModelsResponse,
@@ -39,6 +41,10 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
   const [embeddingTestResult, setEmbeddingTestResult] = useState("");
   const [translationTestResult, setTranslationTestResult] = useState("");
   const [ocrTestResult, setOcrTestResult] = useState("");
+  
+  // Custom test inputs
+  const [customTranslationText, setCustomTranslationText] = useState("Hola, ¿cómo estás?");
+  const [ocrTestFile, setOcrTestFile] = useState<File | null>(null);
   
   const OCR_MODEL = "deepseek-ocr:3b"; // Hardcoded in backend
   
@@ -109,16 +115,17 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
   };
 
   const handleTestTranslation = async () => {
-    if (!selectedTranslation) return;
+    if (!customTranslationText.trim()) {
+      setTranslationTestResult("✗ Please enter text to translate");
+      return;
+    }
+    
     setIsTestingTranslation(true);
     setTranslationTestResult("");
     try {
-      const result = await testOllamaModel(selectedTranslation, "llm", "translation");
+      const result = await testTranslation(customTranslationText);
       if (result.status === "success" && result.output) {
-        const display = result.input 
-          ? `✓ Input: "${result.input}" → Output: "${result.output}"`
-          : `✓ ${result.output}`;
-        setTranslationTestResult(display);
+        setTranslationTestResult(`✓ Translated successfully\n\nInput: "${result.input}"\n\nOutput: "${result.output}"`);
       } else if (result.status === "success") {
         setTranslationTestResult("✓ Working");
       } else {
@@ -132,15 +139,17 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
   };
 
   const handleTestOCR = async () => {
+    if (!ocrTestFile) {
+      setOcrTestResult("✗ Please select an image file");
+      return;
+    }
+    
     setIsTestingOCR(true);
     setOcrTestResult("");
     try {
-      const result = await testOllamaModel(OCR_MODEL, "llm", "ocr");
+      const result = await testOCR(ocrTestFile);
       if (result.status === "success" && result.output) {
-        const display = result.input 
-          ? `✓ Input: "${result.input}" → Output: "${result.output}"`
-          : `✓ ${result.output}`;
-        setOcrTestResult(display);
+        setOcrTestResult(`✓ OCR successful\n\nInput: ${result.input}\n\nExtracted text:\n${result.output}`);
       } else if (result.status === "success") {
         setOcrTestResult("✓ Working");
       } else {
@@ -535,17 +544,34 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
         </label>
         <div className="config-value-row">
           <span className="config-value">{OCR_MODEL}</span>
-          <button
-            className="config-test-btn"
-            onClick={handleTestOCR}
-            disabled={isTestingOCR}
-          >
-            {isTestingOCR ? "Testing..." : "Test"}
-          </button>
         </div>
+        
+        <div className="test-input-section">
+          <label className="test-input-label">Test image with text:</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setOcrTestFile(e.target.files?.[0] || null)}
+            className="test-input-file"
+          />
+          {ocrTestFile && (
+            <div className="file-preview">
+              Selected: {ocrTestFile.name} ({(ocrTestFile.size / 1024).toFixed(1)} KB)
+            </div>
+          )}
+        </div>
+        
+        <button
+          className="config-test-btn"
+          onClick={handleTestOCR}
+          disabled={isTestingOCR || !ocrTestFile}
+        >
+          {isTestingOCR ? "Testing..." : "Test OCR"}
+        </button>
+        
         {ocrTestResult && (
-          <div className={`test-result-inline ${ocrTestResult.startsWith("✓") ? "success" : "error"}`}>
-            {ocrTestResult}
+          <div className={`test-result-block ${ocrTestResult.startsWith("✓") ? "success" : "error"}`}>
+            <pre>{ocrTestResult}</pre>
           </div>
         )}
       </div>

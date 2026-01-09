@@ -12,20 +12,57 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from . import settings
 
 # In-memory storage for conversation history per session
-# session_id -> list of (role, content) messages
-_conversation_memory: Dict[str, List[tuple[str, str]]] = defaultdict(list)
+# session_id -> {"messages": list of (role, content), "last_access": timestamp}
+_conversation_memory: Dict[str, Dict[str, Any]] = {}
 _memory_lock = threading.Lock()
+
+# Memory management constants
+MAX_MESSAGES_PER_SESSION = 40  # Keep last 40 messages (20 pairs)
+MAX_SESSIONS = 100  # Maximum number of concurrent sessions
+SESSION_TTL_SECONDS = 3600  # 1 hour TTL for inactive sessions
+
+# Cached vectorstore and embeddings (singleton pattern for performance)
+_vectorstore: Optional[Chroma] = None
+_embeddings: Optional[OllamaEmbeddings] = None
+_vectorstore_lock = threading.Lock()
 
 
 def _get_embeddings() -> OllamaEmbeddings:
-    return OllamaEmbeddings(model=settings.EMBED_MODEL_NAME)
+    """Get or create cached embeddings instance."""
+    global _embeddings
+    with _vectorstore_lock:
+        if _embeddings is None:
+            _embeddings = OllamaEmbeddings(model=settings.EMBED_MODEL_NAME)
+        return _embeddings
 
 
 def _get_vectorstore() -> Chroma:
-    return Chroma(
-        persist_directory=str(settings.VECTORDB_DIR),
-        embedding_function=_get_embeddings(),
-    )
+    """Get or create cached vectorstore instance."""
+    global _vectorstore, _embeddings
+    with _vectorstore_lock:
+        if _vectorstore is None:
+            # Create embeddings inline to avoid nested lock acquisition
+            if _embeddings is None:
+                _embeddings = OllamaEmbeddings(model=settings.EMBED_MODEL_NAME)
+            _vectorstore = Chroma(
+                persist_directory=str(settings.VECTORDB_DIR),
+                embedding_function=_embeddings,
+            )
+        return _vectorstore
+
+
+def reload_vectorstore() -> None:
+    """Clear cached vectorstore and embeddings.
+    
+    Call this when:
+    - Embedding model changes
+    - Database is reset/rebuilt
+    - Manual refresh is needed
+    """
+    global _vectorstore, _embeddings
+    with _vectorstore_lock:
+        _vectorstore = None
+        _embeddings = None
 
 
 def _build_retriever(device_id: Optional[str], room: Optional[str]):
@@ -79,8 +116,29 @@ Context from manual:
 
 
 def _format_docs(docs):
-    """Format retrieved documents into context string."""
-    return "\n\n".join(doc.page_content for doc in docs)
+    """Format retrieved documents into context string with source headers.
+    
+    Adds source information for better grounding and to help the model
+    avoid mixing information from different devices.
+    """
+    formatted_chunks = []
+    for doc in docs:
+        meta = doc.metadata or {}
+        device_name = meta.get("device_name", "Unknown device")
+        file_name = meta.get("file_name", "Unknown file")
+        page = meta.get("page")
+        
+        # Build source header
+        source_header = f"SOURCE: {device_name}"
+        if file_name:
+            source_header += f" ({file_name})"
+        if page:
+            source_header += f" - Page {page}"
+        
+        # Combine header with content
+        formatted_chunks.append(f"{source_header}\n{doc.page_content}")
+    
+    return "\n\n---\n\n".join(formatted_chunks)
 
 
 def _build_sources_from_docs(docs) -> List[Dict[str, Any]]:
@@ -103,8 +161,39 @@ def _build_sources_from_docs(docs) -> List[Dict[str, Any]]:
     return sources
 
 
+def _cleanup_expired_sessions():
+    """Remove expired sessions based on TTL and enforce max session limit.
+    
+    Called automatically during memory operations to keep memory bounded.
+    """
+    import time
+    
+    with _memory_lock:
+        current_time = time.time()
+        
+        # Remove expired sessions (TTL-based)
+        expired = [
+            sid for sid, data in _conversation_memory.items()
+            if current_time - data.get("last_access", 0) > SESSION_TTL_SECONDS
+        ]
+        for sid in expired:
+            del _conversation_memory[sid]
+        
+        # If still over limit, remove oldest sessions
+        if len(_conversation_memory) > MAX_SESSIONS:
+            sorted_sessions = sorted(
+                _conversation_memory.items(),
+                key=lambda x: x[1].get("last_access", 0)
+            )
+            to_remove = len(_conversation_memory) - MAX_SESSIONS
+            for sid, _ in sorted_sessions[:to_remove]:
+                del _conversation_memory[sid]
+
+
 def _get_conversation_messages(session_id: Optional[str], max_messages: int = 10) -> List:
     """Get conversation history for a session as LangChain messages."""
+    import time
+    
     if not session_id:
         return []
     
@@ -112,8 +201,11 @@ def _get_conversation_messages(session_id: Optional[str], max_messages: int = 10
         if session_id not in _conversation_memory:
             return []
         
+        # Update last access time
+        _conversation_memory[session_id]["last_access"] = time.time()
+        
         # Get recent messages (last max_messages pairs)
-        history = _conversation_memory[session_id][-max_messages:]
+        history = _conversation_memory[session_id]["messages"][-max_messages:]
         messages = []
         
         for role, content in history:
@@ -127,16 +219,31 @@ def _get_conversation_messages(session_id: Optional[str], max_messages: int = 10
 
 def _add_to_memory(session_id: Optional[str], role: str, content: str):
     """Add a message to conversation memory."""
+    import time
+    
     if not session_id:
         return
     
     with _memory_lock:
-        _conversation_memory[session_id].append((role, content))
+        # Initialize session if needed
+        if session_id not in _conversation_memory:
+            _conversation_memory[session_id] = {
+                "messages": [],
+                "last_access": time.time()
+            }
         
-        # Limit memory size per session (keep last 20 message pairs = 40 messages)
-        max_messages = 40
-        if len(_conversation_memory[session_id]) > max_messages:
-            _conversation_memory[session_id] = _conversation_memory[session_id][-max_messages:]
+        # Add message
+        _conversation_memory[session_id]["messages"].append((role, content))
+        _conversation_memory[session_id]["last_access"] = time.time()
+        
+        # Limit memory size per session
+        messages = _conversation_memory[session_id]["messages"]
+        if len(messages) > MAX_MESSAGES_PER_SESSION:
+            _conversation_memory[session_id]["messages"] = messages[-MAX_MESSAGES_PER_SESSION:]
+        
+        # Periodic cleanup (every 10th message addition)
+        if len(_conversation_memory) > MAX_SESSIONS * 0.8:  # Cleanup when 80% full
+            _cleanup_expired_sessions()
 
 
 def clear_session_memory(session_id: Optional[str]):

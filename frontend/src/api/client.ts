@@ -381,12 +381,53 @@ export async function testOllamaModel(
   return res.json();
 }
 
-export async function restartOllama(): Promise<{ status: string; message: string }> {
+export async function restartOllama(): Promise<{ 
+  status: "started" | "already_running" | "rate_limited" | "error"; 
+  message: string 
+}> {
   const res = await fetch(apiUrl("/setup/ollama/restart"), {
     method: "POST",
   });
   if (!res.ok) {
     throw new Error("Failed to restart Ollama");
+  }
+  return res.json();
+}
+
+export async function testTranslation(text: string, sourceLang?: string): Promise<{
+  status: string;
+  input?: string;
+  output?: string;
+  source_lang?: string;
+  message?: string;
+}> {
+  const res = await fetch(apiUrl("/setup/translation/test"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, source_lang: sourceLang }),
+  });
+  if (!res.ok) {
+    throw new Error("Translation test failed");
+  }
+  return res.json();
+}
+
+export async function testOCR(file: File): Promise<{
+  status: string;
+  input?: string;
+  output?: string;
+  full_output?: string;
+  message?: string;
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  const res = await fetch(apiUrl("/setup/ocr/test"), {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new Error("OCR test failed");
   }
   return res.json();
 }
