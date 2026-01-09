@@ -27,15 +27,6 @@ _embeddings: Optional[OllamaEmbeddings] = None
 _vectorstore_lock = threading.Lock()
 
 
-def _get_embeddings() -> OllamaEmbeddings:
-    """Get or create cached embeddings instance."""
-    global _embeddings
-    with _vectorstore_lock:
-        if _embeddings is None:
-            _embeddings = OllamaEmbeddings(model=settings.EMBED_MODEL_NAME)
-        return _embeddings
-
-
 def _get_vectorstore() -> Chroma:
     """Get or create cached vectorstore instance."""
     global _vectorstore, _embeddings
