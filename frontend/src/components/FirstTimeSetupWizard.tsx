@@ -102,7 +102,16 @@ export function FirstTimeSetupWizard({ onComplete }: FirstTimeSetupWizardProps) 
     setLlmTestResult("");
     try {
       const result = await testOllamaModel(selectedLLM, "llm");
-      setLlmTestResult(result.status === "success" ? "✓ Working" : `✗ ${result.message}`);
+      if (result.status === "success" && result.output) {
+        const display = result.input 
+          ? `✓ Input: "${result.input}" → Output: "${result.output}"`
+          : `✓ ${result.output}`;
+        setLlmTestResult(display);
+      } else if (result.status === "success") {
+        setLlmTestResult("✓ Working");
+      } else {
+        setLlmTestResult(`✗ ${result.message}`);
+      }
     } catch (err) {
       setLlmTestResult(`✗ ${getErrorMessage(err)}`);
     } finally {
@@ -117,7 +126,16 @@ export function FirstTimeSetupWizard({ onComplete }: FirstTimeSetupWizardProps) 
     setEmbeddingTestResult("");
     try {
       const result = await testOllamaModel(selectedEmbedding, "embedding");
-      setEmbeddingTestResult(result.status === "success" ? "✓ Working" : `✗ ${result.message}`);
+      if (result.status === "success" && result.output) {
+        const display = result.input 
+          ? `✓ Input: "${result.input}" → ${result.output}`
+          : `✓ ${result.output}`;
+        setEmbeddingTestResult(display);
+      } else if (result.status === "success") {
+        setEmbeddingTestResult("✓ Working");
+      } else {
+        setEmbeddingTestResult(`✗ ${result.message}`);
+      }
     } catch (err) {
       setEmbeddingTestResult(`✗ ${getErrorMessage(err)}`);
     } finally {
@@ -346,6 +364,7 @@ export function FirstTimeSetupWizard({ onComplete }: FirstTimeSetupWizardProps) 
     </div>
   );
 }
+
 
 
 

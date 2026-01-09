@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { checkOllamaConnection, getConfig, type ConfigData } from "../api/client";
+import { useEffect, useRef, useState } from "react";
+import { checkOllamaConnection, getConfig, restartOllama, type ConfigData } from "../api/client";
 import "./StatusHeader.css";
 
 type OllamaStatus = {
@@ -25,7 +25,8 @@ export function StatusHeader() {
   const [ollamaStatus, setOllamaStatus] = useState<OllamaStatus | null>(null);
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [lastCheck, setLastCheck] = useState<number>(Date.now());
+  const [isRestarting, setIsRestarting] = useState(false);
+  const lastCheckRef = useRef<number>(Date.now());
 
   async function loadStatus() {
     try {
@@ -35,13 +36,32 @@ export function StatusHeader() {
       ]);
       setOllamaStatus(ollamaRes);
       setConfig(configRes);
-      setLastCheck(Date.now());
+      lastCheckRef.current = Date.now();
     } catch (err) {
       console.error("Failed to load status:", err);
       setOllamaStatus({ status: "error", message: "Connection failed" });
-      setLastCheck(Date.now());
+      lastCheckRef.current = Date.now();
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleRestartOllama() {
+    if (isRestarting) return;
+    
+    setIsRestarting(true);
+    try {
+      const result = await restartOllama();
+      console.log(result.message);
+      
+      // Wait 3 seconds before checking status
+      setTimeout(() => {
+        loadStatus();
+        setIsRestarting(false);
+      }, 3000);
+    } catch (err) {
+      console.error("Failed to restart Ollama:", err);
+      setIsRestarting(false);
     }
   }
 
@@ -59,7 +79,8 @@ export function StatusHeader() {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         // Only check if more than 10 seconds since last check
-        if (Date.now() - lastCheck > 10000) {
+        const timeSinceLastCheck = Date.now() - lastCheckRef.current;
+        if (timeSinceLastCheck > 10000) {
           loadStatus();
         }
       }
@@ -71,7 +92,8 @@ export function StatusHeader() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       globalStatusCheck = null;
     };
-  }, [lastCheck]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run once on mount
 
   if (isLoading) {
     return (
@@ -89,9 +111,13 @@ export function StatusHeader() {
       {/* Ollama Connection Status */}
       <div className="status-item">
         <div className="status-label">Ollama</div>
-        <div className={`status-value ${isConnected ? "status-connected" : "status-disconnected"}`}>
+        <div 
+          className={`status-value ${isConnected ? "status-connected" : "status-disconnected"} ${!isConnected ? "status-clickable" : ""}`}
+          onClick={!isConnected ? handleRestartOllama : undefined}
+          title={!isConnected ? "Click to restart Ollama" : undefined}
+        >
           <span className="status-indicator"></span>
-          {isConnected ? "Connected" : "Disconnected"}
+          {isRestarting ? "Restarting..." : (isConnected ? "Connected" : "Disconnected")}
           {ollamaStatus?.version && <span className="status-version">v{ollamaStatus.version}</span>}
         </div>
       </div>

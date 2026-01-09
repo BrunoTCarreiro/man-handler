@@ -35,6 +35,13 @@
   font-weight: 500;
 }
 
+.config-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: normal;
+  margin-left: 6px;
+}
+
 .config-value-row {
   display: flex;
   align-items: center;
@@ -307,6 +314,7 @@
     width: 100%;
   }
 }
+
 
 
 

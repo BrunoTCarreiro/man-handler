@@ -26,6 +26,7 @@ from .config_manager import (
     check_ollama_connection,
     get_config,
     list_ollama_models,
+    restart_ollama,
     test_model,
 )
 
@@ -219,9 +220,15 @@ def get_ollama_models() -> dict:
 
 
 @app.post("/setup/ollama/test-model")
-def test_ollama_model(model_name: str, model_type: str = "llm") -> dict:
+def test_ollama_model(model_name: str, model_type: str = "llm", model_purpose: str = "general") -> dict:
     """Test if a specific model is working."""
-    return test_model(model_name, model_type)
+    return test_model(model_name, model_type, model_purpose)
+
+
+@app.post("/setup/ollama/restart")
+def restart_ollama_service() -> dict:
+    """Restart the Ollama service."""
+    return restart_ollama()
 
 
 @app.post("/setup/complete")

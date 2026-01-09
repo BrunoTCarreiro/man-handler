@@ -260,3 +260,4 @@ try {
 **Status:** ✅ Complete and tested  
 **Result:** Smarter, more responsive status checking with minimal overhead
 
+

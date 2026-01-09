@@ -367,12 +367,26 @@ export async function getOllamaModels(): Promise<OllamaModelsResponse> {
   return res.json();
 }
 
-export async function testOllamaModel(modelName: string, modelType: "llm" | "embedding"): Promise<{ status: string; message: string }> {
-  const res = await fetch(apiUrl(`/setup/ollama/test-model?model_name=${encodeURIComponent(modelName)}&model_type=${modelType}`), {
+export async function testOllamaModel(
+  modelName: string, 
+  modelType: "llm" | "embedding",
+  modelPurpose: "general" | "translation" | "ocr" = "general"
+): Promise<{ status: string; message: string; input?: string; output?: string }> {
+  const res = await fetch(apiUrl(`/setup/ollama/test-model?model_name=${encodeURIComponent(modelName)}&model_type=${modelType}&model_purpose=${modelPurpose}`), {
     method: "POST",
   });
   if (!res.ok) {
     throw new Error("Failed to test model");
+  }
+  return res.json();
+}
+
+export async function restartOllama(): Promise<{ status: string; message: string }> {
+  const res = await fetch(apiUrl("/setup/ollama/restart"), {
+    method: "POST",
+  });
+  if (!res.ok) {
+    throw new Error("Failed to restart Ollama");
   }
   return res.json();
 }

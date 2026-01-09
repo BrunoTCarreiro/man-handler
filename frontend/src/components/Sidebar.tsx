@@ -1,3 +1,4 @@
+import { ChatIcon, BookIcon, SettingsIcon } from "./icons";
 import "./Sidebar.css";
 
 interface SidebarProps {
@@ -20,13 +21,15 @@ export function Sidebar({ isExpanded, activeSection, onToggle, onSectionChange, 
             {isExpanded ? "MH" : "M"}
           </div>
           {isExpanded && <h1 className="sidebar-title">ManHandler</h1>}
-          <button
-            className="sidebar-toggle"
-            onClick={onToggle}
-            aria-label={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
-          >
-            {isExpanded ? "◀" : "▶"}
-          </button>
+          {isExpanded && (
+            <button
+              className="sidebar-toggle"
+              onClick={onToggle}
+              aria-label="Collapse sidebar"
+            >
+              ◀
+            </button>
+          )}
         </div>
 
       <nav className="sidebar-nav">
@@ -35,7 +38,9 @@ export function Sidebar({ isExpanded, activeSection, onToggle, onSectionChange, 
           onClick={() => onSectionChange("ask")}
           title={isExpanded ? undefined : "Ask"}
         >
-          <span className="nav-icon">💬</span>
+          <span className="nav-icon">
+            <ChatIcon size={20} />
+          </span>
           {isExpanded && <span className="nav-label">Ask</span>}
         </button>
         <button
@@ -43,7 +48,9 @@ export function Sidebar({ isExpanded, activeSection, onToggle, onSectionChange, 
           onClick={() => onSectionChange("manuals")}
           title={isExpanded ? undefined : "Manuals"}
         >
-          <span className="nav-icon">📚</span>
+          <span className="nav-icon">
+            <BookIcon size={20} />
+          </span>
           {isExpanded && <span className="nav-label">Manuals</span>}
         </button>
         <button
@@ -51,10 +58,28 @@ export function Sidebar({ isExpanded, activeSection, onToggle, onSectionChange, 
           onClick={() => onSectionChange("settings")}
           title={isExpanded ? undefined : "Settings"}
         >
-          <span className="nav-icon">⚙️</span>
+          <span className="nav-icon">
+            <SettingsIcon size={20} />
+          </span>
           {isExpanded && <span className="nav-label">Settings</span>}
         </button>
       </nav>
+      
+      {!isExpanded && (
+        <div 
+          className="sidebar-resize-handle"
+          onClick={onToggle}
+          aria-label="Expand sidebar"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onToggle();
+            }
+          }}
+        />
+      )}
     </aside>
     </>
   );

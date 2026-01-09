@@ -22,6 +22,8 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingLLM, setIsTestingLLM] = useState(false);
   const [isTestingEmbedding, setIsTestingEmbedding] = useState(false);
+  const [isTestingTranslation, setIsTestingTranslation] = useState(false);
+  const [isTestingOCR, setIsTestingOCR] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
@@ -35,6 +37,10 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
   const [selectedTranslation, setSelectedTranslation] = useState("");
   const [llmTestResult, setLlmTestResult] = useState("");
   const [embeddingTestResult, setEmbeddingTestResult] = useState("");
+  const [translationTestResult, setTranslationTestResult] = useState("");
+  const [ocrTestResult, setOcrTestResult] = useState("");
+  
+  const OCR_MODEL = "deepseek-ocr:3b"; // Hardcoded in backend
   
   // RAG params
   const [topK, setTopK] = useState(5);
@@ -98,7 +104,53 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
     if (!config) return;
     setSelectedTranslation(config.ollama_models.translation);
     setEditingTranslation(true);
+    setTranslationTestResult("");
     if (!models) loadModels();
+  };
+
+  const handleTestTranslation = async () => {
+    if (!selectedTranslation) return;
+    setIsTestingTranslation(true);
+    setTranslationTestResult("");
+    try {
+      const result = await testOllamaModel(selectedTranslation, "llm", "translation");
+      if (result.status === "success" && result.output) {
+        const display = result.input 
+          ? `✓ Input: "${result.input}" → Output: "${result.output}"`
+          : `✓ ${result.output}`;
+        setTranslationTestResult(display);
+      } else if (result.status === "success") {
+        setTranslationTestResult("✓ Working");
+      } else {
+        setTranslationTestResult(`✗ ${result.message}`);
+      }
+    } catch (err) {
+      setTranslationTestResult(`✗ ${getErrorMessage(err)}`);
+    } finally {
+      setIsTestingTranslation(false);
+    }
+  };
+
+  const handleTestOCR = async () => {
+    setIsTestingOCR(true);
+    setOcrTestResult("");
+    try {
+      const result = await testOllamaModel(OCR_MODEL, "llm", "ocr");
+      if (result.status === "success" && result.output) {
+        const display = result.input 
+          ? `✓ Input: "${result.input}" → Output: "${result.output}"`
+          : `✓ ${result.output}`;
+        setOcrTestResult(display);
+      } else if (result.status === "success") {
+        setOcrTestResult("✓ Working");
+      } else {
+        setOcrTestResult(`✗ ${result.message}`);
+      }
+    } catch (err) {
+      setOcrTestResult(`✗ ${getErrorMessage(err)}`);
+    } finally {
+      setIsTestingOCR(false);
+    }
   };
 
   const handleTestLLM = async () => {
@@ -107,7 +159,16 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
     setLlmTestResult("");
     try {
       const result = await testOllamaModel(selectedLLM, "llm");
-      setLlmTestResult(result.status === "success" ? "✓ Working" : `✗ ${result.message}`);
+      if (result.status === "success" && result.output) {
+        const display = result.input 
+          ? `✓ Input: "${result.input}" → Output: "${result.output}"`
+          : `✓ ${result.output}`;
+        setLlmTestResult(display);
+      } else if (result.status === "success") {
+        setLlmTestResult("✓ Working");
+      } else {
+        setLlmTestResult(`✗ ${result.message}`);
+      }
     } catch (err) {
       setLlmTestResult(`✗ ${getErrorMessage(err)}`);
     } finally {
@@ -121,7 +182,16 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
     setEmbeddingTestResult("");
     try {
       const result = await testOllamaModel(selectedEmbedding, "embedding");
-      setEmbeddingTestResult(result.status === "success" ? "✓ Working" : `✗ ${result.message}`);
+      if (result.status === "success" && result.output) {
+        const display = result.input 
+          ? `✓ Input: "${result.input}" → ${result.output}`
+          : `✓ ${result.output}`;
+        setEmbeddingTestResult(display);
+      } else if (result.status === "success") {
+        setEmbeddingTestResult("✓ Working");
+      } else {
+        setEmbeddingTestResult(`✗ ${result.message}`);
+      }
     } catch (err) {
       setEmbeddingTestResult(`✗ ${getErrorMessage(err)}`);
     } finally {
@@ -410,7 +480,10 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
               <>
                 <select
                   value={selectedTranslation}
-                  onChange={(e) => setSelectedTranslation(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedTranslation(e.target.value);
+                    setTranslationTestResult("");
+                  }}
                   className="config-select"
                 >
                   {models.llm_models.map((model) => (
@@ -420,6 +493,13 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
                   ))}
                 </select>
                 <div className="config-actions">
+                  <button
+                    className="config-test-btn"
+                    onClick={handleTestTranslation}
+                    disabled={isTestingTranslation}
+                  >
+                    {isTestingTranslation ? "Testing..." : "Test"}
+                  </button>
                   <button
                     className="config-save-btn"
                     onClick={handleSaveTranslation}
@@ -434,10 +514,38 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
                     Cancel
                   </button>
                 </div>
+                {translationTestResult && (
+                  <div className={`test-result-inline ${translationTestResult.startsWith("✓") ? "success" : "error"}`}>
+                    {translationTestResult}
+                  </div>
+                )}
               </>
             ) : (
               <p className="no-models-text">No LLM models found</p>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* OCR Model (Read-only) */}
+      <div className="config-item">
+        <label className="config-label">
+          OCR Model
+          <span className="config-hint">(Fixed in backend)</span>
+        </label>
+        <div className="config-value-row">
+          <span className="config-value">{OCR_MODEL}</span>
+          <button
+            className="config-test-btn"
+            onClick={handleTestOCR}
+            disabled={isTestingOCR}
+          >
+            {isTestingOCR ? "Testing..." : "Test"}
+          </button>
+        </div>
+        {ocrTestResult && (
+          <div className={`test-result-inline ${ocrTestResult.startsWith("✓") ? "success" : "error"}`}>
+            {ocrTestResult}
           </div>
         )}
       </div>
@@ -519,6 +627,7 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
     </section>
   );
 }
+
 
 
 

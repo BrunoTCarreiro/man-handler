@@ -115,7 +115,16 @@
   font-size: 1.3rem;
   flex-shrink: 0;
   width: 24px;
-  text-align: center;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .nav-label {
@@ -131,6 +140,47 @@
 .sidebar.collapsed .nav-item {
   justify-content: center;
   padding: 12px;
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: pointer;
+  background: transparent;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.sidebar-resize-handle::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 48px;
+  background: linear-gradient(to right, rgba(79, 70, 229, 0.4), rgba(6, 182, 212, 0.4));
+  border-radius: 4px 0 0 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar.collapsed:hover .sidebar-resize-handle::before {
+  opacity: 1;
+}
+
+.sidebar-resize-handle:hover::before {
+  opacity: 1;
+  background: linear-gradient(to right, rgba(79, 70, 229, 0.7), rgba(6, 182, 212, 0.7));
+  width: 5px;
+  height: 64px;
+}
+
+.sidebar-resize-handle:active::before {
+  background: linear-gradient(to right, rgba(79, 70, 229, 0.9), rgba(6, 182, 212, 0.9));
 }
 
 .sidebar-backdrop {

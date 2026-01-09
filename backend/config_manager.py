@@ -10,6 +10,8 @@ Handles:
 
 import json
 import logging
+import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 import requests
@@ -228,57 +230,130 @@ def list_ollama_models() -> dict:
         }
 
 
-def test_model(model_name: str, model_type: str = "llm") -> dict:
+def test_model(model_name: str, model_type: str = "llm", model_purpose: str = "general") -> dict:
     """
     Test if a specific model is working.
     
     Args:
         model_name: Name of the model to test
         model_type: Type of model ("llm" or "embedding")
+        model_purpose: Purpose of model ("general", "translation", "ocr")
     
     Returns:
-        dict with test results
+        dict with test results including input and output
     """
     try:
         if model_type == "embedding":
             # Test embedding model
+            test_prompt = "semantic search query"
             response = requests.post(
                 f"{OLLAMA_BASE_URL}/api/embeddings",
                 json={
                     "model": model_name,
-                    "prompt": "test",
+                    "prompt": test_prompt,
                 },
                 timeout=30,
             )
+            
+            if response.status_code == 200:
+                data = response.json()
+                embedding = data.get("embedding", [])
+                logger.info("Model %s tested successfully", model_name)
+                return {
+                    "status": "success",
+                    "message": f"Model {model_name} is working correctly",
+                    "input": test_prompt,
+                    "output": f"Generated {len(embedding)}-dimensional embedding vector",
+                }
         else:
-            # Test LLM model
+            # Test LLM model with purpose-specific prompt
+            if model_purpose == "translation":
+                test_prompt = "Translate to English: Hola, ¿cómo estás?"
+            elif model_purpose == "ocr":
+                test_prompt = "Extract text from this document image: [INVOICE] ACME Corp. Invoice #12345 Date: 2024-01-15"
+            else:
+                test_prompt = "Say hello in one sentence."
+            
             response = requests.post(
                 f"{OLLAMA_BASE_URL}/api/generate",
                 json={
                     "model": model_name,
-                    "prompt": "Hello",
+                    "prompt": test_prompt,
                     "stream": False,
                 },
                 timeout=30,
             )
+            
+            if response.status_code == 200:
+                data = response.json()
+                generated_text = data.get("response", "").strip()
+                logger.info("Model %s tested successfully", model_name)
+                return {
+                    "status": "success",
+                    "message": f"Model {model_name} is working correctly",
+                    "input": test_prompt,
+                    "output": generated_text,
+                }
         
-        if response.status_code == 200:
-            logger.info("Model %s tested successfully", model_name)
-            return {
-                "status": "success",
-                "message": f"Model {model_name} is working correctly",
-            }
-        else:
-            logger.error("Model test failed with status %s", response.status_code)
-            return {
-                "status": "error",
-                "message": f"Model test failed (status {response.status_code})",
-            }
+        # Handle non-200 responses
+        logger.error("Model test failed with status %s", response.status_code)
+        return {
+            "status": "error",
+            "message": f"Model test failed (status {response.status_code})",
+        }
     
     except Exception as e:
         logger.error("Error testing model %s: %s", model_name, e)
         return {
             "status": "error",
             "message": str(e),
+        }
+
+
+def restart_ollama() -> dict:
+    """
+    Attempt to restart Ollama service.
+    
+    Returns:
+        dict with status and message
+    """
+    try:
+        logger.info("Attempting to restart Ollama service...")
+        
+        # Platform-specific commands
+        if sys.platform == "win32":
+            # On Windows, start Ollama in the background
+            subprocess.Popen(
+                ["ollama", "serve"],
+                creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        else:
+            # On Unix-like systems (macOS, Linux)
+            subprocess.Popen(
+                ["ollama", "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+        
+        logger.info("Ollama restart command issued successfully")
+        return {
+            "status": "success",
+            "message": "Ollama restart initiated. Please wait a few seconds for it to start.",
+        }
+    
+    except FileNotFoundError:
+        logger.error("Ollama executable not found in PATH")
+        return {
+            "status": "error",
+            "message": "Ollama executable not found. Please ensure Ollama is installed.",
+        }
+    except Exception as e:
+        logger.error("Error restarting Ollama: %s", e)
+        return {
+            "status": "error",
+            "message": f"Failed to restart Ollama: {str(e)}",
         }
 

@@ -25,6 +25,7 @@ An ADR is a document that captures an important architectural decision made alon
 | [012](012-device-actions-consolidation.md) | Device Actions Consolidation and View Manual Feature | Accepted | 2025-12-14 |
 | [013](013-code-quality-and-configuration.md) | Code Quality Infrastructure and Centralized Configuration | Accepted | 2025-12-15 |
 | [014](014-first-time-setup-and-configuration.md) | First-Time Setup Wizard and Configuration Management | Accepted | 2026-01-06 |
+| [015](015-ui-improvements-and-system-monitoring.md) | UI/UX Improvements and System Monitoring | Accepted | 2026-01-09 |
 
 ## Decision Status
 
@@ -70,6 +71,9 @@ When making significant architectural decisions:
 
 2026-01-06: Setup & Configuration Management
   └─ ADR-014: First-time setup wizard and dynamic model configuration
+
+2026-01-09: UI/UX & System Monitoring
+  └─ ADR-015: Sidebar improvements, status polling fix, enhanced model testing, Ollama restart
 ```
 
 ## Related Documentation

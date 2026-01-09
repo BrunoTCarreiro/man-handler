@@ -73,6 +73,23 @@
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
 }
 
+.status-clickable {
+  cursor: pointer;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.status-clickable:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+
+.status-clickable:active {
+  transform: scale(0.98);
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
@@ -115,4 +132,5 @@
     font-size: 0.75rem;
   }
 }
+
 
