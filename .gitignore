@@ -52,6 +52,21 @@ tasks.md
 # Local manual/test artifacts
 extraction_page_*.txt
 
+# Development/testing scripts (keep in repo but ignore changes)
+extract_english_pages.py
+extract_manual.py
+test_deepseek_ocr.py
+test_ocr_ingestion.py
+FLATICON_ICONS_GUIDE.md
+
+# Implementation summaries (completed features)
+IMPLEMENTATION_STATUS_SEPARATE_MODELS.md
+SEPARATE_MODELS_COMPLETE.md
+STATUS_CHECK_IMPROVEMENTS.md
+STATUS_HEADER_IMPLEMENTATION.md
+DOCUMENTATION_REVIEW_*.md
+CLEANUP_SUMMARY_*.md
 
 IMPROVEMENTS_BACKLOG_AND_IMPLEMENTATION_GUIDE.md
 IMPROVEMENTS_IMPLEMENTATION_SUMMARY.md
+docs/TESTING_STRATEGY.md

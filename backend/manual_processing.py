@@ -225,8 +225,8 @@ def analyze_extracted_manual(token: str) -> Dict:
         # Fallback to filename-based suggestion if no text could be extracted
         return suggest_device_metadata(meta["stored_filename"])
     
-    # Use LLM to extract device metadata
-    llm = ChatOllama(model=settings.LLM_MODEL_NAME, temperature=0)
+    # Use analysis model to extract device metadata
+    llm = ChatOllama(model=settings.ANALYSIS_MODEL_NAME, temperature=0)
     
     prompt = f"""You are analyzing a device manual. Extract the following information from the text:
 - Device name (the product name)

@@ -19,6 +19,8 @@ export function FirstTimeSetupWizard({ onComplete }: FirstTimeSetupWizardProps) 
   const [models, setModels] = useState<OllamaModelsResponse | null>(null);
   const [selectedLLM, setSelectedLLM] = useState<string>("");
   const [selectedEmbedding, setSelectedEmbedding] = useState<string>("");
+  const [selectedTranslation, setSelectedTranslation] = useState<string>("");
+  const [selectedAnalysis, setSelectedAnalysis] = useState<string>("");
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isTestingLLM, setIsTestingLLM] = useState(false);
   const [isTestingEmbedding, setIsTestingEmbedding] = useState(false);
@@ -145,14 +147,19 @@ export function FirstTimeSetupWizard({ onComplete }: FirstTimeSetupWizardProps) 
 
   const handleComplete = async () => {
     if (!selectedLLM || !selectedEmbedding) {
-      setError("Please select both LLM and embedding models");
+      setError("Please select both Chat Model and Embedding Model");
       return;
     }
 
     setIsCompleting(true);
     setError("");
     try {
-      await completeSetup(selectedLLM, selectedEmbedding, selectedLLM);
+      await completeSetup(
+        selectedLLM, 
+        selectedEmbedding, 
+        selectedTranslation || selectedLLM,
+        selectedAnalysis || selectedLLM
+      );
       onComplete();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -230,11 +237,25 @@ export function FirstTimeSetupWizard({ onComplete }: FirstTimeSetupWizardProps) 
                   </div>
                 ) : models && models.total > 0 ? (
                   <>
-                    {/* LLM Selection */}
+                    {/* Chat/RAG Model Selection */}
                     <div className="model-group">
                       <label htmlFor="llm-select">
-                        <strong>Language Model (LLM)</strong>
-                        <span className="label-hint">For chat, translation, and analysis</span>
+                        <span className="label-title">
+                          <strong>Chat Model</strong>
+                          <span 
+                            className="help-icon" 
+                            data-tooltip="What is the Chat Model?
+
+The Chat Model (LLM) answers your questions about devices using information from your manuals. It understands context, makes connections, and provides helpful explanations.
+
+Choosing a model:
+• Larger models (13B+): Better understanding, more accurate answers, slower
+• Medium models (7-8B): Good balance of speed and quality
+• Smaller models (3B): Faster but may miss nuances
+
+Recommended: mistral:instruct or llama3.1"
+                          >ⓘ</span>
+                        </span>
                       </label>
                       <div className="model-select-row">
                         <select
@@ -271,8 +292,25 @@ export function FirstTimeSetupWizard({ onComplete }: FirstTimeSetupWizardProps) 
                     {/* Embedding Selection */}
                     <div className="model-group">
                       <label htmlFor="embedding-select">
-                        <strong>Embedding Model</strong>
-                        <span className="label-hint">For semantic search in manuals</span>
+                        <span className="label-title">
+                          <strong>Embedding Model</strong>
+                          <span 
+                            className="help-icon"
+                            data-tooltip="What is the Embedding Model?
+
+The Embedding Model converts text into numerical vectors that capture meaning. This enables the system to find relevant manual sections even when you use different words.
+
+Choosing a model:
+• Multilingual (bge-m3): Works with multiple languages
+• English-only (nomic-embed-text): Smaller, English-optimized
+
+You typically don't need to change this unless:
+• Multilingual manuals → bge-m3
+• English only + want to save space → nomic-embed-text
+
+Recommended: bge-m3 for best compatibility"
+                          >ⓘ</span>
+                        </span>
                       </label>
                       <div className="model-select-row">
                         <select
@@ -306,10 +344,98 @@ export function FirstTimeSetupWizard({ onComplete }: FirstTimeSetupWizardProps) 
                       )}
                     </div>
 
+                    {/* Translation Model Selection (Optional) */}
+                    <div className="model-group">
+                      <label htmlFor="translation-select">
+                        <span className="label-title">
+                          <strong>Translation Model <span className="optional-badge">(Optional)</span></strong>
+                          <span 
+                            className="help-icon"
+                            data-tooltip="What is the Translation Model?
+
+The Translation Model converts non-English manual text to English before processing. It preserves formatting and technical terms while making the content accessible.
+
+Choosing a model:
+• Larger models: Better at preserving context and technical terms
+• Multilingual models: Better at handling various languages
+
+When to use a different model:
+• You have many non-English manuals
+• You want faster/slower translation
+• You find quality issues with the Chat Model
+
+Default: Uses Chat Model if not selected"
+                          >ⓘ</span>
+                        </span>
+                      </label>
+                      <div className="model-select-row">
+                        <select
+                          id="translation-select"
+                          value={selectedTranslation}
+                          onChange={(e) => setSelectedTranslation(e.target.value)}
+                          className="model-select"
+                        >
+                          <option value="">-- Use Chat Model --</option>
+                          {models.llm_models.map((model) => (
+                            <option key={model.name} value={model.name}>
+                              {model.name} ({formatBytes(model.size)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Metadata Analysis Model Selection (Optional) */}
+                    <div className="model-group">
+                      <label htmlFor="analysis-select">
+                        <span className="label-title">
+                          <strong>Metadata Analysis Model <span className="optional-badge">(Optional)</span></strong>
+                          <span 
+                            className="help-icon"
+                            data-tooltip="What is the Metadata Analysis Model?
+
+When you upload a manual PDF, this model reads the first few pages to automatically extract:
+• Device name
+• Brand/manufacturer
+• Model number  
+• Device category
+• Suggested room
+
+This saves you from typing metadata manually.
+
+Choosing a model:
+• Larger models: Better at understanding complex layouts
+• Fast models: Quick metadata extraction
+
+When to use a different model:
+• You want faster upload processing
+• You find the Chat Model too slow for this task
+
+Default: Uses Chat Model if not selected"
+                          >ⓘ</span>
+                        </span>
+                      </label>
+                      <div className="model-select-row">
+                        <select
+                          id="analysis-select"
+                          value={selectedAnalysis}
+                          onChange={(e) => setSelectedAnalysis(e.target.value)}
+                          className="model-select"
+                        >
+                          <option value="">-- Use Chat Model --</option>
+                          {models.llm_models.map((model) => (
+                            <option key={model.name} value={model.name}>
+                              {model.name} ({formatBytes(model.size)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
                     {/* Recommended models hint */}
                     {models.llm_models.length > 0 && models.embedding_models.length > 0 && (
                       <div className="setup-hint">
-                        <strong>Recommended:</strong> mistral:instruct for LLM, bge-m3 for embeddings
+                        <strong>Recommended:</strong> mistral:instruct for Chat, bge-m3 for Embeddings
                       </div>
                     )}
                   </>

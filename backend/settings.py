@@ -55,8 +55,9 @@ else:
 # Model Configuration
 # =============================================================================
 EMBED_MODEL_NAME = os.getenv("EMBED_MODEL", "bge-m3")
-LLM_MODEL_NAME = os.getenv("LLM_MODEL", "mistral:instruct")  # Mistral 7B - good multilingual support
-TRANSLATION_MODEL_NAME = os.getenv("TRANSLATION_MODEL", "mistral:instruct")  # Same model for translation
+LLM_MODEL_NAME = os.getenv("LLM_MODEL", "mistral:instruct")  # For chat/RAG
+TRANSLATION_MODEL_NAME = os.getenv("TRANSLATION_MODEL", "mistral:instruct")  # For translating manuals
+ANALYSIS_MODEL_NAME = os.getenv("ANALYSIS_MODEL", "mistral:instruct")  # For metadata extraction
 
 
 # =============================================================================

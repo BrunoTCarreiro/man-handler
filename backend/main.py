@@ -145,18 +145,21 @@ class UpdateModelsRequest(BaseModel):
     llm_model: Optional[str] = None
     embedding_model: Optional[str] = None
     translation_model: Optional[str] = None
+    analysis_model: Optional[str] = None
 
 
 class CompleteSetupRequest(BaseModel):
     llm_model: str
     embedding_model: str
     translation_model: Optional[str] = None
+    analysis_model: Optional[str] = None
 
 
 class UpdateConfigRequest(BaseModel):
     llm_model: Optional[str] = None
     embedding_model: Optional[str] = None
     translation_model: Optional[str] = None
+    analysis_model: Optional[str] = None
     top_k: Optional[int] = None
     chunk_size: Optional[int] = None
     chunk_overlap: Optional[int] = None
@@ -203,6 +206,7 @@ def get_setup_status() -> SetupStatusResponse:
             "llm_model": config.get_llm_model(),
             "embedding_model": config.get_embedding_model(),
             "translation_model": config.get_translation_model(),
+            "analysis_model": config.get_analysis_model(),
         },
     )
 
@@ -333,6 +337,7 @@ def complete_setup(request: CompleteSetupRequest) -> dict:
         llm=request.llm_model,
         embedding=request.embedding_model,
         translation=request.translation_model or request.llm_model,
+        analysis=request.analysis_model or request.llm_model,
     )
     
     # Mark setup as completed
@@ -352,6 +357,7 @@ def complete_setup(request: CompleteSetupRequest) -> dict:
             "llm_model": config.get_llm_model(),
             "embedding_model": config.get_embedding_model(),
             "translation_model": config.get_translation_model(),
+            "analysis_model": config.get_analysis_model(),
         },
     }
 
@@ -375,7 +381,7 @@ def update_setup_config(request: UpdateConfigRequest) -> dict:
     embedding_changed = False
     
     # Update models if provided
-    if request.llm_model or request.embedding_model or request.translation_model:
+    if request.llm_model or request.embedding_model or request.translation_model or request.analysis_model:
         if request.embedding_model:
             embedding_changed = True
         
@@ -383,12 +389,14 @@ def update_setup_config(request: UpdateConfigRequest) -> dict:
             llm=request.llm_model,
             embedding=request.embedding_model,
             translation=request.translation_model,
+            analysis=request.analysis_model,
         )
         logger.info(
-            "Updated models: LLM=%s, Embedding=%s, Translation=%s",
+            "Updated models: LLM=%s, Embedding=%s, Translation=%s, Analysis=%s",
             request.llm_model or "unchanged",
             request.embedding_model or "unchanged",
             request.translation_model or "unchanged",
+            request.analysis_model or "unchanged",
         )
     
     # Reload vectorstore if embedding model changed

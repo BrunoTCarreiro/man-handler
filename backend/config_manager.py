@@ -59,6 +59,7 @@ class SetupConfig:
                 "llm": settings.LLM_MODEL_NAME,
                 "embedding": settings.EMBED_MODEL_NAME,
                 "translation": settings.TRANSLATION_MODEL_NAME,
+                "analysis": settings.ANALYSIS_MODEL_NAME,
             },
             "rag_params": {
                 "top_k": settings.TOP_K,
@@ -89,7 +90,7 @@ class SetupConfig:
         self.config["setup_completed"] = True
         self.save_config()
 
-    def update_models(self, llm: Optional[str] = None, embedding: Optional[str] = None, translation: Optional[str] = None) -> None:
+    def update_models(self, llm: Optional[str] = None, embedding: Optional[str] = None, translation: Optional[str] = None, analysis: Optional[str] = None) -> None:
         """Update model configuration."""
         if llm:
             self.config["ollama_models"]["llm"] = llm
@@ -97,6 +98,8 @@ class SetupConfig:
             self.config["ollama_models"]["embedding"] = embedding
         if translation:
             self.config["ollama_models"]["translation"] = translation
+        if analysis:
+            self.config["ollama_models"]["analysis"] = analysis
         self.save_config()
 
     def update_rag_params(self, top_k: Optional[int] = None, chunk_size: Optional[int] = None, chunk_overlap: Optional[int] = None) -> None:
@@ -124,6 +127,10 @@ class SetupConfig:
     def get_translation_model(self) -> str:
         """Get configured translation model."""
         return self.config.get("ollama_models", {}).get("translation", settings.TRANSLATION_MODEL_NAME)
+
+    def get_analysis_model(self) -> str:
+        """Get configured analysis model."""
+        return self.config.get("ollama_models", {}).get("analysis", settings.ANALYSIS_MODEL_NAME)
 
 
 # Global config instance

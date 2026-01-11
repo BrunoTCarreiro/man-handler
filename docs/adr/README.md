@@ -78,8 +78,8 @@ When making significant architectural decisions:
 
 ## Related Documentation
 
-* [UX_REDESIGN_SUMMARY.md](../../UX_REDESIGN_SUMMARY.md) - Technical guide for ADR-008 implementation
-* [CHUNK_CLEANING_APPROACH.md](../../CHUNK_CLEANING_APPROACH.md) - Technical guide for ADR-005 implementation
-* [README.md](../../README.md) - Project setup and usage
-* [tasks.md](../../tasks.md) - Development roadmap
+* [README.md](../../README.md) - Project setup and usage guide
+* [AI_CONTEXT.md](../../AI_CONTEXT.md) - Quick reference for AI assistants (comprehensive feature overview)
+* [PROJECT_CONTEXT.md](../../PROJECT_CONTEXT.md) - Complete project context package
+* [LICENSE](../../LICENSE) - Project license
 

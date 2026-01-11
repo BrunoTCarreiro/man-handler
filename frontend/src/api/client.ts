@@ -432,7 +432,7 @@ export async function testOCR(file: File): Promise<{
   return res.json();
 }
 
-export async function completeSetup(llmModel: string, embeddingModel: string, translationModel?: string): Promise<{ status: string; message: string }> {
+export async function completeSetup(llmModel: string, embeddingModel: string, translationModel?: string, analysisModel?: string): Promise<{ status: string; message: string }> {
   const res = await fetch(apiUrl("/setup/complete"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -440,6 +440,7 @@ export async function completeSetup(llmModel: string, embeddingModel: string, tr
       llm_model: llmModel,
       embedding_model: embeddingModel,
       translation_model: translationModel,
+      analysis_model: analysisModel,
     }),
   });
 
@@ -457,6 +458,7 @@ export type ConfigData = {
     llm: string;
     embedding: string;
     translation: string;
+    analysis: string;
   };
   rag_params: {
     top_k: number;
@@ -478,6 +480,7 @@ export type UpdateConfigParams = {
   llm_model?: string;
   embedding_model?: string;
   translation_model?: string;
+  analysis_model?: string;
   top_k?: number;
   chunk_size?: number;
   chunk_overlap?: number;

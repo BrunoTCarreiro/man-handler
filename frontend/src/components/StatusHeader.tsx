@@ -149,7 +149,7 @@ export function StatusHeader() {
           <div className="status-separator"></div>
           
           <div className="status-item">
-            <div className="status-label">LLM</div>
+            <div className="status-label">Chat</div>
             <div className="status-value status-model">{config.ollama_models.llm}</div>
           </div>
 
@@ -161,6 +161,11 @@ export function StatusHeader() {
           <div className="status-item">
             <div className="status-label">Translation</div>
             <div className="status-value status-model">{config.ollama_models.translation}</div>
+          </div>
+
+          <div className="status-item">
+            <div className="status-label">Analysis</div>
+            <div className="status-value status-model">{config.ollama_models.analysis}</div>
           </div>
 
           <div className="status-item">

@@ -22,7 +22,7 @@ function validateUrl(url: string, name: string): string {
     console.warn(
       `[Config] Invalid URL for ${name}: "${url}". Using default.`
     );
-    return "http://localhost:8000";
+    return "http://127.0.0.1:8000";
   }
 }
 
@@ -52,8 +52,8 @@ function getApiBaseUrl(): string {
     return apiUrl;
   }
   
-  // Default to localhost
-  return "http://localhost:8000";
+  // Default to localhost (use 127.0.0.1 to ensure IPv4 on Windows)
+  return "http://127.0.0.1:8000";
 }
 
 export const config = {

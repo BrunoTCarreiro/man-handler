@@ -2,8 +2,9 @@
   "setup_completed": true,
   "ollama_models": {
     "llm": "mistral:instruct",
-    "embedding": "bge-m3",
-    "translation": "mistral:instruct"
+    "embedding": "bge-m3:latest",
+    "translation": "mistral:instruct",
+    "analysis": "mistral:instruct"
   },
   "rag_params": {
     "top_k": 5,
@@ -11,8 +12,3 @@
     "chunk_overlap": 200
   }
 }
-
-
-
-
-

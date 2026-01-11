@@ -34,12 +34,15 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
   const [editingLLM, setEditingLLM] = useState(false);
   const [editingEmbedding, setEditingEmbedding] = useState(false);
   const [editingTranslation, setEditingTranslation] = useState(false);
+  const [editingAnalysis, setEditingAnalysis] = useState(false);
   const [selectedLLM, setSelectedLLM] = useState("");
   const [selectedEmbedding, setSelectedEmbedding] = useState("");
   const [selectedTranslation, setSelectedTranslation] = useState("");
+  const [selectedAnalysis, setSelectedAnalysis] = useState("");
   const [llmTestResult, setLlmTestResult] = useState("");
   const [embeddingTestResult, setEmbeddingTestResult] = useState("");
   const [translationTestResult, setTranslationTestResult] = useState("");
+  const [analysisTestResult, setAnalysisTestResult] = useState("");
   const [ocrTestResult, setOcrTestResult] = useState("");
   
   // Custom test inputs
@@ -256,6 +259,56 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
       setConfig(updated);
       setEditingTranslation(false);
       setSuccess("Translation model updated successfully");
+      onConfigUpdate?.();
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleStartEditAnalysis = () => {
+    if (!config) return;
+    setSelectedAnalysis(config.ollama_models.analysis);
+    setEditingAnalysis(true);
+    setAnalysisTestResult("");
+    if (!models) loadModels();
+  };
+
+  const handleTestAnalysis = async () => {
+    if (!selectedAnalysis) return;
+    setIsTestingLLM(true);
+    setAnalysisTestResult("");
+    try {
+      const result = await testOllamaModel(selectedAnalysis, "llm");
+      if (result.status === "success" && result.output) {
+        const display = result.input 
+          ? `✓ Input: "${result.input}" → Output: "${result.output}"`
+          : `✓ ${result.output}`;
+        setAnalysisTestResult(display);
+      } else if (result.status === "success") {
+        setAnalysisTestResult("✓ Working");
+      } else {
+        setAnalysisTestResult(`✗ ${result.message}`);
+      }
+    } catch (err) {
+      setAnalysisTestResult(`✗ ${getErrorMessage(err)}`);
+    } finally {
+      setIsTestingLLM(false);
+    }
+  };
+
+  const handleSaveAnalysis = async () => {
+    if (!selectedAnalysis || !config) return;
+    setIsSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const updated = await updateConfig({ analysis_model: selectedAnalysis });
+      setConfig(updated);
+      setEditingAnalysis(false);
+      setSuccess("Analysis model updated successfully");
       onConfigUpdate?.();
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
@@ -526,6 +579,71 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
                 {translationTestResult && (
                   <div className={`test-result-inline ${translationTestResult.startsWith("✓") ? "success" : "error"}`}>
                     {translationTestResult}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="no-models-text">No LLM models found</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Metadata Analysis Model */}
+      <div className="config-item">
+        <label className="config-label">Metadata Analysis Model</label>
+        {!editingAnalysis ? (
+          <div className="config-value-row">
+            <span className="config-value">{config.ollama_models.analysis}</span>
+            <button className="config-edit-btn" onClick={handleStartEditAnalysis}>
+              Change
+            </button>
+          </div>
+        ) : (
+          <div className="config-edit-box">
+            {isLoadingModels ? (
+              <p className="loading-text-small">Loading models...</p>
+            ) : models && models.llm_models.length > 0 ? (
+              <>
+                <select
+                  value={selectedAnalysis}
+                  onChange={(e) => {
+                    setSelectedAnalysis(e.target.value);
+                    setAnalysisTestResult("");
+                  }}
+                  className="config-select"
+                >
+                  {models.llm_models.map((model) => (
+                    <option key={model.name} value={model.name}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="config-actions">
+                  <button
+                    className="config-test-btn"
+                    onClick={handleTestAnalysis}
+                    disabled={isTestingLLM}
+                  >
+                    {isTestingLLM ? "Testing..." : "Test"}
+                  </button>
+                  <button
+                    className="config-save-btn"
+                    onClick={handleSaveAnalysis}
+                    disabled={isSaving || selectedAnalysis === config.ollama_models.analysis}
+                  >
+                    Save
+                  </button>
+                  <button
+                    className="config-cancel-btn"
+                    onClick={() => setEditingAnalysis(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {analysisTestResult && (
+                  <div className={`test-result-inline ${analysisTestResult.startsWith("✓") ? "success" : "error"}`}>
+                    {analysisTestResult}
                   </div>
                 )}
               </>

@@ -378,3 +378,4 @@ export function ChatIcon({ className, size = 24 }: IconProps) {
 **Result:** Professional, scalable vector icons that match your app's design! 🎨
 
 
+
