@@ -19,8 +19,14 @@ Features automatic language detection, selective extraction (60-70% time savings
 - [Ollama](https://ollama.com) running locally:
   ```bash
   ollama pull mistral:instruct
-  ollama pull bge-m3
+  
+  # Embedding model - choose one:
+  ollama pull nomic-embed-text  # Recommended: English-only, smaller (274MB), faster
+  # OR
+  ollama pull bge-m3            # Alternative: Multilingual, larger (1.2GB)
   ```
+  
+  **Note:** Since we translate all manuals to English, `nomic-embed-text` (English-focused, 274MB) is recommended over `bge-m3` (multilingual, 1.2GB) for better performance. See `docs/EMBEDDING_MODEL_CHOICE.md` for details.
 
 ---
 

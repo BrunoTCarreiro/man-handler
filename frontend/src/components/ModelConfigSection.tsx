@@ -346,7 +346,7 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
     try {
       const updated = await updateConfig({
         llm_model: "mistral:instruct",
-        embedding_model: "bge-m3",
+        embedding_model: "nomic-embed-text",
         translation_model: "mistral:instruct",
         top_k: 5,
         chunk_size: 800,
@@ -396,7 +396,22 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
 
       {/* LLM Model */}
       <div className="config-item">
-        <label className="config-label">Language Model (LLM)</label>
+        <label className="config-label">
+          Language Model (LLM)
+          <span 
+            className="help-icon" 
+            data-tooltip="What is the Chat Model?
+
+The Chat Model (LLM) answers your questions about devices using information from your manuals. It understands context, makes connections, and provides helpful explanations.
+
+Choosing a model:
+• Larger models (13B+): Better understanding, more accurate answers, slower
+• Medium models (7-8B): Good balance of speed and quality
+• Smaller models (3B): Faster but may miss nuances
+
+Recommended: mistral:instruct or llama3.1"
+          >ⓘ</span>
+        </label>
         {!editingLLM ? (
           <div className="config-value-row">
             <span className="config-value">{config.ollama_models.llm}</span>
@@ -461,7 +476,23 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
 
       {/* Embedding Model */}
       <div className="config-item">
-        <label className="config-label">Embedding Model</label>
+        <label className="config-label">
+          Embedding Model
+          <span 
+            className="help-icon"
+            data-tooltip="What is the Embedding Model?
+
+The Embedding Model converts text into numerical vectors that capture meaning. This enables the system to find relevant manual sections even when you use different words.
+
+Choosing a model:
+• English-only (nomic-embed-text): Smaller (274MB), English-optimized
+• Multilingual (bge-m3): Larger (1.2GB), works with multiple languages
+
+Since all manuals are translated to English before embedding:
+✓ Recommended: nomic-embed-text (4.4x smaller, faster, better English precision)
+• Alternative: bge-m3 (if you want multilingual flexibility)"
+          >ⓘ</span>
+        </label>
         {!editingEmbedding ? (
           <div className="config-value-row">
             <span className="config-value">{config.ollama_models.embedding}</span>
@@ -526,7 +557,26 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
 
       {/* Translation Model */}
       <div className="config-item">
-        <label className="config-label">Translation Model</label>
+        <label className="config-label">
+          Translation Model
+          <span 
+            className="help-icon"
+            data-tooltip="What is the Translation Model?
+
+The Translation Model converts non-English manual text to English before processing. It preserves formatting and technical terms while making the content accessible.
+
+Choosing a model:
+• Larger models: Better at preserving context and technical terms
+• Multilingual models: Better at handling various languages
+
+When to use a different model:
+• You have many non-English manuals
+• You want faster/slower translation
+• You find quality issues with the Chat Model
+
+Default: Uses Chat Model if not selected"
+          >ⓘ</span>
+        </label>
         {!editingTranslation ? (
           <div className="config-value-row">
             <span className="config-value">{config.ollama_models.translation}</span>
@@ -591,7 +641,32 @@ export function ModelConfigSection({ onConfigUpdate }: ModelConfigSectionProps) 
 
       {/* Metadata Analysis Model */}
       <div className="config-item">
-        <label className="config-label">Metadata Analysis Model</label>
+        <label className="config-label">
+          Metadata Analysis Model
+          <span 
+            className="help-icon"
+            data-tooltip="What is the Metadata Analysis Model?
+
+When you upload a manual PDF, this model reads the first few pages to automatically extract:
+• Device name
+• Brand/manufacturer
+• Model number  
+• Device category
+• Suggested room
+
+This saves you from typing metadata manually.
+
+Choosing a model:
+• Larger models: Better at understanding complex layouts
+• Fast models: Quick metadata extraction
+
+When to use a different model:
+• You want faster upload processing
+• You find the Chat Model too slow for this task
+
+Default: Uses Chat Model if not selected"
+          >ⓘ</span>
+        </label>
         {!editingAnalysis ? (
           <div className="config-value-row">
             <span className="config-value">{config.ollama_models.analysis}</span>

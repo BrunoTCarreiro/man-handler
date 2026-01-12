@@ -54,7 +54,10 @@ else:
 # =============================================================================
 # Model Configuration
 # =============================================================================
-EMBED_MODEL_NAME = os.getenv("EMBED_MODEL", "bge-m3")
+# Use nomic-embed-text (English-focused, 274MB) instead of bge-m3 (multilingual, 1.2GB)
+# since all manuals are translated to English before embedding.
+# See docs/EMBEDDING_MODEL_CHOICE.md for detailed comparison.
+EMBED_MODEL_NAME = os.getenv("EMBED_MODEL", "nomic-embed-text")
 LLM_MODEL_NAME = os.getenv("LLM_MODEL", "mistral:instruct")  # For chat/RAG
 TRANSLATION_MODEL_NAME = os.getenv("TRANSLATION_MODEL", "mistral:instruct")  # For translating manuals
 ANALYSIS_MODEL_NAME = os.getenv("ANALYSIS_MODEL", "mistral:instruct")  # For metadata extraction

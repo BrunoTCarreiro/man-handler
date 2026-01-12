@@ -76,7 +76,9 @@ export function FirstTimeSetupWizard({ onComplete }: FirstTimeSetupWizardProps) 
         
         // Auto-select recommended models if available
         const recommendedLLM = result.llm_models.find(m => m.name.includes("mistral:instruct"));
-        const recommendedEmbedding = result.embedding_models.find(m => m.name.includes("bge-m3"));
+        // Prefer nomic-embed-text (English-optimized) over bge-m3 (multilingual)
+        const recommendedEmbedding = result.embedding_models.find(m => m.name.includes("nomic-embed-text")) 
+          || result.embedding_models.find(m => m.name.includes("bge-m3"));
         
         if (recommendedLLM) setSelectedLLM(recommendedLLM.name);
         if (recommendedEmbedding) setSelectedEmbedding(recommendedEmbedding.name);
@@ -301,14 +303,12 @@ Recommended: mistral:instruct or llama3.1"
 The Embedding Model converts text into numerical vectors that capture meaning. This enables the system to find relevant manual sections even when you use different words.
 
 Choosing a model:
-• Multilingual (bge-m3): Works with multiple languages
-• English-only (nomic-embed-text): Smaller, English-optimized
+• English-only (nomic-embed-text): Smaller (274MB), English-optimized
+• Multilingual (bge-m3): Larger (1.2GB), works with multiple languages
 
-You typically don't need to change this unless:
-• Multilingual manuals → bge-m3
-• English only + want to save space → nomic-embed-text
-
-Recommended: bge-m3 for best compatibility"
+Since all manuals are translated to English before embedding:
+✓ Recommended: nomic-embed-text (4.4x smaller, faster, better English precision)
+• Alternative: bge-m3 (if you want multilingual flexibility)"
                           >ⓘ</span>
                         </span>
                       </label>
@@ -435,7 +435,7 @@ Default: Uses Chat Model if not selected"
                     {/* Recommended models hint */}
                     {models.llm_models.length > 0 && models.embedding_models.length > 0 && (
                       <div className="setup-hint">
-                        <strong>Recommended:</strong> mistral:instruct for Chat, bge-m3 for Embeddings
+                        <strong>Recommended:</strong> mistral:instruct for Chat, nomic-embed-text for Embeddings
                       </div>
                     )}
                   </>

@@ -182,6 +182,18 @@ def check_ollama_connection() -> dict:
         }
 
 
+def get_recommended_embedding_model() -> str:
+    """
+    Return recommended embedding model based on use case.
+    
+    For English-only content (which we have after translation),
+    nomic-embed-text is smaller and potentially more precise.
+    For multilingual content, bge-m3 is better.
+    """
+    # Since we translate everything to English, recommend English-focused model
+    return "nomic-embed-text"
+
+
 def list_ollama_models() -> dict:
     """
     List all models available in Ollama.
