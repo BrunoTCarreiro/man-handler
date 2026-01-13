@@ -66,6 +66,7 @@ export function App() {
   });
   const [activeSection, setActiveSection] = useState<"ask" | "manuals" | "settings">("ask");
   const [isSettingsPanelOpen, setIsSettingsPanelOpen] = useState(false);
+  const [deviceSortBy, setDeviceSortBy] = useState<"name" | "brand">("name");
   
   // Check setup status on mount
   useEffect(() => {
@@ -410,44 +411,74 @@ export function App() {
             ))}
           </div>
           <div className="input-bar">
-            <select
-              id="device"
-              className="device-dropdown"
-              value={selectedDeviceId ?? ""}
-              onChange={(e) =>
-                setSelectedDeviceId(e.target.value || null)
-              }
-            >
-              {devices.length === 0 ? (
-                <option value="">No devices yet</option>
-              ) : (
-                <>
-                  <option value="">All devices</option>
-                  {(() => {
-                    // Group devices by room
-                    const devicesByRoom = devices.reduce((acc, device) => {
-                      const room = device.room || "Uncategorized";
-                      if (!acc[room]) acc[room] = [];
-                      acc[room].push(device);
-                      return acc;
-                    }, {} as Record<string, Device[]>);
+            <div className="device-selector-container">
+              <select
+                id="device"
+                className="device-dropdown"
+                value={selectedDeviceId ?? ""}
+                onChange={(e) =>
+                  setSelectedDeviceId(e.target.value || null)
+                }
+              >
+                {devices.length === 0 ? (
+                  <option value="">No devices yet</option>
+                ) : (
+                  <>
+                    <option value="">All devices</option>
+                    {(() => {
+                      // Group devices by room
+                      const devicesByRoom = devices.reduce((acc, device) => {
+                        const room = device.room || "Uncategorized";
+                        if (!acc[room]) acc[room] = [];
+                        acc[room].push(device);
+                        return acc;
+                      }, {} as Record<string, Device[]>);
 
-                    // Sort rooms alphabetically
-                    const sortedRooms = Object.keys(devicesByRoom).sort();
+                      // Sort rooms alphabetically
+                      const sortedRooms = Object.keys(devicesByRoom).sort();
 
-                    return sortedRooms.map((room) => (
-                      <optgroup key={room} label={room}>
-                        {devicesByRoom[room].map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name} {d.model ? `(${d.model})` : ""}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ));
-                  })()}
-                </>
+                      // Sort devices within each room
+                      sortedRooms.forEach((room) => {
+                        devicesByRoom[room].sort((a, b) => {
+                          if (deviceSortBy === "brand") {
+                            const brandA = (a.brand || "").toLowerCase();
+                            const brandB = (b.brand || "").toLowerCase();
+                            if (brandA !== brandB) {
+                              return brandA.localeCompare(brandB);
+                            }
+                            // If brands are same, fallback to name
+                            return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase());
+                          } else {
+                            // Sort by name
+                            return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase());
+                          }
+                        });
+                      });
+
+                      return sortedRooms.map((room) => (
+                        <optgroup key={room} label={room}>
+                          {devicesByRoom[room].map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {d.name} {d.model ? `(${d.model})` : ""}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ));
+                    })()}
+                  </>
+                )}
+              </select>
+              {devices.length > 0 && (
+                <button
+                  className="sort-toggle-button"
+                  onClick={() => setDeviceSortBy(deviceSortBy === "name" ? "brand" : "name")}
+                  title={`Currently sorting by: ${deviceSortBy === "name" ? "Device Name" : "Brand"}. Click to switch.`}
+                  type="button"
+                >
+                  {deviceSortBy === "name" ? "A-Z" : "🏷️"}
+                </button>
               )}
-            </select>
+            </div>
             <input
               type="text"
               placeholder={

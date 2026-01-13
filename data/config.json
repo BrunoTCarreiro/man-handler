@@ -2,7 +2,7 @@
   "setup_completed": true,
   "ollama_models": {
     "llm": "mistral:instruct",
-    "embedding": "bge-m3:latest",
+    "embedding": "nomic-embed-text:latest",
     "translation": "mistral:instruct",
     "analysis": "mistral:instruct"
   },

@@ -190,3 +190,4 @@ EMBED_MODEL_NAME = os.getenv("EMBED_MODEL", "nomic-embed-text")  # Changed from 
 4. Document final recommendation
 
 
+
