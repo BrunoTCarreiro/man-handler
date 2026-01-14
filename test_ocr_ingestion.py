@@ -46,8 +46,14 @@ try:
             # Add image references if any
             if r['image_files']:
                 f.write(f"**Images on this page:** {len(r['image_files'])}\n\n")
-                for img_file in r['image_files']:
-                    f.write(f"- `{img_file}`\n")
+                for img_info in r['image_files']:
+                    # Handle both old format (string) and new format (dict)
+                    if isinstance(img_info, dict):
+                        img_file = img_info.get("filename", "unknown")
+                        description = img_info.get("description", "No description")
+                        f.write(f"- `{img_file}`: {description}\n")
+                    else:
+                        f.write(f"- `{img_info}`\n")
                 f.write('\n')
             
             f.write("---\n\n")

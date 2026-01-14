@@ -18,7 +18,7 @@ from . import manual_processing, settings
 from .device_catalog import Device, get_device, list_rooms, load_devices, save_devices
 from .ingest import add_device_manuals, remove_device_from_vectorstore, replace_device_manuals
 from .rag_pipeline import answer_question, clear_session_memory, reload_vectorstore
-from .ocr_extraction import extract_pdf_with_ocr
+from .ocr_extraction import extract_pdf_with_ocr, clean_grounding_tags
 from extract_manual import generate_reference_md
 from .translation import detect_language
 from .language_detection import detect_and_select_language_section, get_language_name
@@ -277,13 +277,13 @@ async def test_ocr(file: UploadFile = File(...)) -> dict:
         image_bytes = await file.read()
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
         
-        # Run OCR using the actual model
+        # Run OCR using the same prompt as describe_image_with_ocr()
         response = ollama.chat(
             model="deepseek-ocr:3b",
             messages=[
                 {
                     "role": "user",
-                    "content": "<|grounding|>Convert the document to markdown.",
+                    "content": "<|grounding|>Describe what this image shows and extract any visible text.",
                     "images": [image_b64],
                 }
             ],
@@ -292,13 +292,16 @@ async def test_ocr(file: UploadFile = File(...)) -> dict:
             },
         )
         
-        extracted_text = response["message"]["content"]
+        raw_text = response["message"]["content"]
+        # Clean grounding tags from output for display
+        extracted_text = clean_grounding_tags(raw_text)
         
         return {
             "status": "success",
             "input": f"Image: {file.filename}",
             "output": extracted_text[:500] + ("..." if len(extracted_text) > 500 else ""),
             "full_output": extracted_text,
+            "raw_output": raw_text,  # Include raw for debugging
         }
     except Exception as e:
         logger.error("OCR test failed: %s", e)
