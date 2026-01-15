@@ -579,11 +579,429 @@
   box-shadow: none;
 }
 
+/* Wide modal for verification step */
+.modal-content.modal-wide {
+  max-width: 1100px;
+}
+
+/* Selected files list */
+.selected-files-list {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.selected-files-list h4 {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.selected-files-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.selected-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(2, 6, 23, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 8px;
+}
+
+.selected-file-item .file-name {
+  flex: 1;
+  font-size: 0.9rem;
+  color: #e5e7eb;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove-file-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(220, 38, 38, 0.2);
+  color: #fca5a5;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-file-btn:hover {
+  background: rgba(220, 38, 38, 0.4);
+  color: #ef4444;
+}
+
+/* Batch progress table */
+.batch-progress-table {
+  margin-top: 16px;
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  overflow: hidden;
+}
+
+.batch-progress-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.batch-progress-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(2, 6, 23, 0.4);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.batch-progress-table td {
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  color: #e5e7eb;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.batch-progress-table tr:last-child td {
+  border-bottom: none;
+}
+
+.batch-progress-table tr.status-row {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.batch-progress-table tr.status-row:hover {
+  background: rgba(6, 182, 212, 0.05);
+}
+
+.file-name-cell {
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-badge.pending {
+  background: rgba(148, 163, 184, 0.15);
+  color: #9ca3af;
+}
+
+.status-badge.processing {
+  background: rgba(6, 182, 212, 0.15);
+  color: #06b6d4;
+}
+
+.status-badge.complete {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.status-badge.error {
+  background: rgba(220, 38, 38, 0.15);
+  color: #ef4444;
+}
+
+.status-badge.cancelled {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.spinner-small {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(6, 182, 212, 0.3);
+  border-top-color: #06b6d4;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.language-cell {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.process-log .log-header {
+  padding: 8px 12px;
+  margin: -14px -14px 12px;
+  background: rgba(2, 6, 23, 0.5);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Verification step layout */
+.verification-step {
+  height: 100%;
+}
+
+.verification-layout {
+  display: flex;
+  gap: 20px;
+  min-height: 500px;
+}
+
+.verification-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.verification-sidebar h4 {
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 0.85rem;
+  color: #9ca3af;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(2, 6, 23, 0.4);
+}
+
+.verification-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.verification-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: 4px;
+}
+
+.verification-list-item:hover {
+  background: rgba(6, 182, 212, 0.1);
+}
+
+.verification-list-item.selected {
+  background: rgba(6, 182, 212, 0.2);
+  border: 1px solid rgba(6, 182, 212, 0.4);
+}
+
+.verification-list-item.verified {
+  opacity: 0.7;
+}
+
+.verification-list-item.verified .verify-indicator {
+  color: #10b981;
+}
+
+.verify-indicator {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.verification-list-item .item-name {
+  font-size: 0.85rem;
+  color: #e5e7eb;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.verification-progress {
+  padding: 12px 16px;
+  font-size: 0.8rem;
+  color: #6b7280;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(2, 6, 23, 0.4);
+}
+
+.verification-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.verification-pdf {
+  flex-shrink: 0;
+}
+
+.verification-form {
+  flex: 1;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.verification-form .metadata-grid {
+  flex: 1;
+}
+
+.verification-form .metadata-grid label .required {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.verification-form .metadata-grid input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.verification-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.verified-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  color: #10b981;
+  font-weight: 500;
+}
+
+.analyzing-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  color: #06b6d4;
+  font-size: 0.95rem;
+}
+
+.analyze-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 30px;
+  color: #ef4444;
+  text-align: center;
+}
+
+.analyze-error .action-button.small {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+}
+
+.no-selection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+/* Upload review list */
+.upload-review {
+  padding: 20px;
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.upload-review h4 {
+  margin: 0 0 16px;
+  font-size: 0.95rem;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.upload-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.upload-list-item {
+  padding: 14px 18px;
+  background: rgba(2, 6, 23, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 10px;
+}
+
+.upload-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.upload-item-info .device-name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
+.upload-item-info .device-details {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
 @media (max-width: 768px) {
   .modal-content {
     max-width: 100%;
     max-height: 100vh;
     border-radius: 0;
+  }
+
+  .modal-content.modal-wide {
+    max-width: 100%;
   }
 
   .wizard-progress {
@@ -615,6 +1033,30 @@
 
   .modal-footer {
     padding: 12px 16px 20px;
+  }
+
+  .verification-layout {
+    flex-direction: column;
+    min-height: auto;
+  }
+
+  .verification-sidebar {
+    width: 100%;
+    max-height: 150px;
+  }
+
+  .verification-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .verification-list-item {
+    flex-shrink: 0;
+    margin-bottom: 0;
   }
 }
 

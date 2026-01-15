@@ -1,13 +1,23 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type {
   ManualMetadata,
   ManualAnalyzeResponse,
-  ManualProcessResponse,
   Device,
 } from "../api/client";
-import { analyzeManual, processManual, commitManual, getDevices, getProcessingStatus, cancelProcessing, deleteDevice } from "../api/client";
+import {
+  analyzeManual,
+  processManual,
+  getDevices,
+  getProcessingStatus,
+  cancelProcessing,
+  deleteDevice,
+  commitManualsBatch,
+  getManualPdfUrl,
+  type BatchCommitItem,
+} from "../api/client";
 import { getErrorMessage } from "../api/errors";
 import { refreshOllamaStatus } from "./StatusHeader";
+import { PdfViewer } from "./PdfViewer";
 import "./ManualOnboardingModal.css";
 
 interface ManualOnboardingModalProps {
@@ -17,7 +27,34 @@ interface ManualOnboardingModalProps {
   replacingDevice?: Device | null;
 }
 
-type WizardStep = "file-selection" | "processing" | "analysis" | "upload";
+type WizardStep = "file-selection" | "processing" | "verification" | "upload";
+
+type BatchManualStatus = "pending" | "processing" | "complete" | "error" | "cancelled";
+
+interface BatchManualItem {
+  id: string;
+  file: File;
+  status: BatchManualStatus;
+  token: string | null;
+  logs: string[];
+  outputFilename: string | null;
+  detectedLanguage: string | null;
+  translated: boolean;
+  metadata: ManualMetadata | null;
+  analyzeStatus: "pending" | "analyzing" | "complete" | "error";
+  analyzeError: string | null;
+  isVerified: boolean;
+}
+
+const emptyMetadata: ManualMetadata = {
+  id: "",
+  name: "",
+  brand: "",
+  model: "",
+  room: "",
+  category: "",
+  manual_files: [],
+};
 
 export function ManualOnboardingModal({
   isOpen,
@@ -25,69 +62,74 @@ export function ManualOnboardingModal({
   onSuccess,
   replacingDevice = null,
 }: ManualOnboardingModalProps) {
-  const emptyMetadata: ManualMetadata = {
-    id: "",
-    name: "",
-    brand: "",
-    model: "",
-    room: "",
-    category: "",
-    manual_files: [],
-  };
-
   const [currentStep, setCurrentStep] = useState<WizardStep>("file-selection");
-  const [manualFile, setManualFile] = useState<File | null>(null);
-  const [processResult, setProcessResult] = useState<ManualProcessResponse | null>(null);
-  const [processLog, setProcessLog] = useState<string[]>([]);
-  const [analyzeResult, setAnalyzeResult] = useState<ManualAnalyzeResponse | null>(null);
-  const [manualMetadata, setManualMetadata] = useState<ManualMetadata>(emptyMetadata);
-  const [analyzeStatus, setAnalyzeStatus] = useState<string | null>(null);
+  const [batchItems, setBatchItems] = useState<BatchManualItem[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [commitStatus, setCommitStatus] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [isUploadComplete, setIsUploadComplete] = useState(false);
-  const pollingIntervalRef = useRef<number | null>(null);
-  const [currentToken, setCurrentToken] = useState<string | null>(null);
-  const processLogRef = useRef<HTMLDivElement | null>(null);
+  const pollingIntervalsRef = useRef<Map<string, number>>(new Map());
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isEnglishManual, setIsEnglishManual] = useState(false);
+  const processLogRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Auto-scroll to latest log entry
+  // Get the currently selected item
+  const selectedItem = batchItems.find((item) => item.id === selectedItemId) || null;
+
+  // Check if all items are processed
+  const allProcessed = batchItems.length > 0 && batchItems.every(
+    (item) => item.status === "complete" || item.status === "error" || item.status === "cancelled"
+  );
+
+  // Check if any item is currently processing
+  const anyProcessing = batchItems.some((item) => item.status === "processing");
+
+  // Check if all items are verified
+  const allVerified = batchItems.length > 0 && batchItems.every(
+    (item) => item.isVerified || item.status === "error" || item.status === "cancelled"
+  );
+
+  // Get items ready for upload (verified and complete)
+  const itemsReadyForUpload = batchItems.filter(
+    (item) => item.isVerified && item.status === "complete" && item.metadata
+  );
+
+  // Auto-scroll processing logs
   useEffect(() => {
-    if (processLogRef.current && processLog.length > 0) {
+    if (processLogRef.current && selectedItem?.logs.length) {
       processLogRef.current.scrollTop = processLogRef.current.scrollHeight;
     }
-  }, [processLog]);
+  }, [selectedItem?.logs]);
 
-  const stopStatusPolling = () => {
-    if (pollingIntervalRef.current !== null) {
-      window.clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
+  const stopAllPolling = useCallback(() => {
+    pollingIntervalsRef.current.forEach((intervalId) => {
+      window.clearInterval(intervalId);
+    });
+    pollingIntervalsRef.current.clear();
+  }, []);
+
+  const stopPollingForItem = useCallback((itemId: string) => {
+    const intervalId = pollingIntervalsRef.current.get(itemId);
+    if (intervalId !== undefined) {
+      window.clearInterval(intervalId);
+      pollingIntervalsRef.current.delete(itemId);
     }
-  };
+  }, []);
 
-  const resetWizard = () => {
+  const resetWizard = useCallback(() => {
     setCurrentStep("file-selection");
-    setManualFile(null);
-    setProcessResult(null);
-    setProcessLog([]);
-    setAnalyzeResult(null);
-    setManualMetadata(emptyMetadata);
-    setAnalyzeStatus(null);
+    setBatchItems([]);
+    setSelectedItemId(null);
     setCommitStatus(null);
-    setIsProcessing(false);
-    setIsAnalyzing(false);
     setIsCommitting(false);
     setIsUploadComplete(false);
-    setCurrentToken(null);
     setIsEnglishManual(false);
-    stopStatusPolling();
-  };
+    stopAllPolling();
+  }, [stopAllPolling]);
 
   const handleClose = () => {
-    // If any work in progress, show confirmation
-    if (isProcessing || isAnalyzing || isCommitting || manualFile || processResult) {
+    if (anyProcessing || batchItems.length > 0 || isCommitting) {
       setShowCancelConfirm(true);
     } else {
       resetWizard();
@@ -97,15 +139,17 @@ export function ManualOnboardingModal({
 
   const handleCancelWizard = async () => {
     // Cancel any ongoing processing
-    if (currentToken && isProcessing) {
-      try {
-        await cancelProcessing(currentToken);
-      } catch (err) {
-        console.error("Failed to cancel processing:", err);
+    for (const item of batchItems) {
+      if (item.token && item.status === "processing") {
+        try {
+          await cancelProcessing(item.token);
+        } catch (err) {
+          console.error("Failed to cancel processing:", err);
+        }
       }
     }
-    
-    stopStatusPolling();
+
+    stopAllPolling();
     setShowCancelConfirm(false);
     resetWizard();
     onClose();
@@ -114,216 +158,250 @@ export function ManualOnboardingModal({
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      stopStatusPolling();
+      stopAllPolling();
     };
-  }, []);
+  }, [stopAllPolling]);
 
-  // (Auto-scroll handled above; keep single effect to avoid duplicate work.)
-
-  // Auto-start analysis when entering step 3
-  // Intentionally only triggers on step change to avoid re-running on every render
-  /* eslint-disable react-hooks/exhaustive-deps */
-  useEffect(() => {
-    if (currentStep === "analysis" && processResult && !analyzeResult && !isAnalyzing) {
-      handleAnalyze();
-    }
-  }, [currentStep]);
-  /* eslint-enable react-hooks/exhaustive-deps */
-
-  // Reset wizard when modal opens (clean state)
+  // Reset wizard when modal opens
   useEffect(() => {
     if (isOpen) {
       resetWizard();
-      // If replacing a device, pre-fill its metadata
+      // If replacing a device, we'll handle it differently (single file mode)
       if (replacingDevice) {
-        setManualMetadata({
-          id: replacingDevice.id,
-          name: replacingDevice.name,
-          brand: replacingDevice.brand || "",
-          model: replacingDevice.model || "",
-          room: replacingDevice.room || "",
-          category: replacingDevice.category || "",
-          manual_files: replacingDevice.manual_files || [],
-        });
+        // Pre-fill metadata for replace mode
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, replacingDevice]);
+  }, [isOpen, replacingDevice, resetWizard]);
 
   if (!isOpen) return null;
 
-  const handleFileSelect = (file: File | null) => {
-    setManualFile(file);
-    if (file) {
-      setProcessResult(null);
-      setProcessLog([]);
-      setAnalyzeResult(null);
-      setManualMetadata(emptyMetadata);
-      setAnalyzeStatus(null);
-      setCommitStatus(null);
-    }
+  const handleFilesSelect = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const newItems: BatchManualItem[] = Array.from(files).map((file, index) => ({
+      id: `${Date.now()}-${index}-${file.name}`,
+      file,
+      status: "pending",
+      token: null,
+      logs: [],
+      outputFilename: null,
+      detectedLanguage: null,
+      translated: false,
+      metadata: null,
+      analyzeStatus: "pending",
+      analyzeError: null,
+      isVerified: false,
+    }));
+
+    setBatchItems((prev) => [...prev, ...newItems]);
   };
 
-  const handleProcess = async () => {
-    if (!manualFile) return;
-    
-    // Stop any existing polling
-    stopStatusPolling();
-    
-    setIsProcessing(true);
-    setProcessLog(["[INFO] Uploading file..."]);
-    setAnalyzeStatus(null);
-    setCommitStatus(null);
-
-    try {
-      // Check Ollama status before starting processing
-      await refreshOllamaStatus();
-      
-      // Call process endpoint - it returns immediately with a token
-      const response = await processManual(manualFile, isEnglishManual);
-      const token = response.token;
-      setCurrentToken(token);
-      
-      setProcessLog((prev) => [...prev, "[INFO] Processing started, polling for updates..."]);
-      
-      // Start polling for status
-      await pollUntilComplete(token);
-      
-    } catch (err: unknown) {
-      setProcessLog((prev) => [...prev, `[ERROR] Failed to start processing: ${getErrorMessage(err)}`]);
-      setIsProcessing(false);
-      setCurrentToken(null);
-    }
+  const handleRemoveFile = (itemId: string) => {
+    stopPollingForItem(itemId);
+    setBatchItems((prev) => prev.filter((item) => item.id !== itemId));
   };
 
-  const pollUntilComplete = async (token: string) => {
-    return new Promise<void>((resolve, reject) => {
-      const pollInterval = setInterval(async () => {
-        try {
-          const status = await getProcessingStatus(token);
-          
-          // Update logs
-          if (status.logs && Array.isArray(status.logs)) {
-            setProcessLog(status.logs);
-          }
-          
-          // Check if done
-          if (status.status === "complete") {
-            clearInterval(pollInterval);
-            
-            // Extract results from status
-            const result: ManualProcessResponse = {
-              token: token,
-              detected_language: status.detected_language || "unknown",
-              translated: status.translated || false,
-              output_filename: status.output_filename || "",
-              pages: null,
-              logs: status.logs,
-            };
-            
-            setProcessResult(result);
-            setProcessLog((prev) => [
-              ...prev,
-              `[OK] Processed: ${result.output_filename}`,
-              `[OK] Language: ${result.detected_language}`,
-              `[OK] Translated: ${result.translated ? "yes" : "no"}`,
-            ]);
-            
-            setIsProcessing(false);
-            setCurrentToken(null);
-            resolve();
-            
-          } else if (status.status === "cancelled") {
-            clearInterval(pollInterval);
-            setProcessLog((prev) => [...prev, "[INFO] Processing cancelled successfully"]);
-            setIsProcessing(false);
-            setCurrentToken(null);
-            resolve();
-            
-          } else if (status.status === "error") {
-            clearInterval(pollInterval);
-            setProcessLog((prev) => [...prev, "[ERROR] Processing failed"]);
-            setIsProcessing(false);
-            setCurrentToken(null);
-            reject(new Error("Processing failed"));
-          }
-          
-        } catch (err: unknown) {
-          console.debug("Polling error:", err);
-        }
-      }, 3000);
-      
-      // Store interval ref for cancellation
-      pollingIntervalRef.current = pollInterval;
+  const updateBatchItem = (itemId: string, updates: Partial<BatchManualItem>) => {
+    setBatchItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, ...updates } : item))
+    );
+  };
+
+  const processNextItem = async () => {
+    // Find the next pending item
+    const nextItem = batchItems.find((item) => item.status === "pending");
+    if (!nextItem) return;
+
+    await processItem(nextItem.id);
+  };
+
+  const processItem = async (itemId: string) => {
+    const item = batchItems.find((i) => i.id === itemId);
+    if (!item) return;
+
+    updateBatchItem(itemId, {
+      status: "processing",
+      logs: ["[INFO] Uploading file..."],
     });
-  };
-
-  const handleAnalyze = async () => {
-    const token = processResult?.token;
-    if (!token) return;
-    
-    setIsAnalyzing(true);
-    setAnalyzeStatus("Analyzing manual with AI...");
-    setCommitStatus(null);
 
     try {
-      const response = await analyzeManual(token);
-      setAnalyzeResult(response);
-      setManualMetadata(response.suggested_metadata);
-      setAnalyzeStatus("[OK] Metadata populated. Review and edit if needed.");
+      await refreshOllamaStatus();
+
+      const response = await processManual(item.file, isEnglishManual);
+      const token = response.token;
+
+      updateBatchItem(itemId, {
+        token,
+        logs: ["[INFO] Processing started, polling for updates..."],
+      });
+
+      // Start polling for this item
+      pollForItem(itemId, token);
     } catch (err: unknown) {
-      setAnalyzeStatus(`[ERROR] Analyze failed: ${getErrorMessage(err)}`);
-    } finally {
-      setIsAnalyzing(false);
+      updateBatchItem(itemId, {
+        status: "error",
+        logs: [...item.logs, `[ERROR] Failed to start processing: ${getErrorMessage(err)}`],
+      });
+      // Process next item
+      setTimeout(processNextItem, 100);
     }
   };
 
-  const handleCommit = async () => {
-    const result = processResult;
-    if (!result) return;
-    
-    const manualFilename = result.output_filename || manualMetadata.manual_files[0] || "";
+  const pollForItem = (itemId: string, token: string) => {
+    const pollInterval = window.setInterval(async () => {
+      try {
+        const status = await getProcessingStatus(token);
 
-    if (!manualFilename) {
-      setCommitStatus("[ERROR] No manual filename available to upload.");
-      return;
-    }
+        // Update logs
+        if (status.logs && Array.isArray(status.logs)) {
+          updateBatchItem(itemId, { logs: status.logs });
+        }
 
-    if (!manualMetadata.id.trim() || !manualMetadata.name.trim()) {
-      setCommitStatus("[ERROR] Device ID and name are required before uploading.");
-      return;
+        if (status.status === "complete") {
+          stopPollingForItem(itemId);
+          updateBatchItem(itemId, {
+            status: "complete",
+            outputFilename: status.output_filename || "",
+            detectedLanguage: status.detected_language || "unknown",
+            translated: status.translated || false,
+            logs: [
+              ...(status.logs || []),
+              `[OK] Processed: ${status.output_filename}`,
+              `[OK] Language: ${status.detected_language}`,
+              `[OK] Translated: ${status.translated ? "yes" : "no"}`,
+            ],
+          });
+          // Process next item
+          setTimeout(processNextItem, 100);
+        } else if (status.status === "cancelled") {
+          stopPollingForItem(itemId);
+          updateBatchItem(itemId, {
+            status: "cancelled",
+            logs: [...(status.logs || []), "[INFO] Processing cancelled"],
+          });
+          // Process next item
+          setTimeout(processNextItem, 100);
+        } else if (status.status === "error") {
+          stopPollingForItem(itemId);
+          updateBatchItem(itemId, {
+            status: "error",
+            logs: [...(status.logs || []), "[ERROR] Processing failed"],
+          });
+          // Process next item
+          setTimeout(processNextItem, 100);
+        }
+      } catch (err) {
+        console.debug("Polling error:", err);
+      }
+    }, 3000);
+
+    pollingIntervalsRef.current.set(itemId, pollInterval);
+  };
+
+  const handleStartProcessing = async () => {
+    if (batchItems.length === 0) return;
+
+    await refreshOllamaStatus();
+
+    // Start processing the first item
+    processNextItem();
+  };
+
+  const handleAnalyzeItem = async (itemId: string) => {
+    const item = batchItems.find((i) => i.id === itemId);
+    if (!item || !item.token) return;
+
+    updateBatchItem(itemId, {
+      analyzeStatus: "analyzing",
+      analyzeError: null,
+    });
+
+    try {
+      const response: ManualAnalyzeResponse = await analyzeManual(item.token);
+      updateBatchItem(itemId, {
+        metadata: response.suggested_metadata,
+        analyzeStatus: "complete",
+      });
+    } catch (err: unknown) {
+      updateBatchItem(itemId, {
+        analyzeStatus: "error",
+        analyzeError: getErrorMessage(err),
+        metadata: emptyMetadata,
+      });
     }
+  };
+
+  const handleUpdateMetadata = (itemId: string, field: keyof ManualMetadata, value: string) => {
+    setBatchItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== itemId || !item.metadata) return item;
+        return {
+          ...item,
+          metadata: {
+            ...item.metadata,
+            [field]: value,
+          },
+        };
+      })
+    );
+  };
+
+  const handleVerifyItem = (itemId: string) => {
+    const item = batchItems.find((i) => i.id === itemId);
+    if (!item || !item.metadata || !item.metadata.id || !item.metadata.name) return;
+
+    updateBatchItem(itemId, { isVerified: true });
+
+    // Auto-select next unverified item
+    const nextUnverified = batchItems.find(
+      (i) => i.id !== itemId && !i.isVerified && i.status === "complete"
+    );
+    if (nextUnverified) {
+      setSelectedItemId(nextUnverified.id);
+      // Auto-analyze if not already done
+      if (nextUnverified.analyzeStatus === "pending") {
+        handleAnalyzeItem(nextUnverified.id);
+      }
+    }
+  };
+
+  const handleCommitBatch = async () => {
+    if (itemsReadyForUpload.length === 0) return;
 
     setIsCommitting(true);
-    
+    setCommitStatus("Preparing to upload manuals...");
+
     try {
       // If replacing a device, delete the old one first
-      if (replacingDevice) {
+      if (replacingDevice && itemsReadyForUpload.length === 1) {
         setCommitStatus(`Deleting old manual for "${replacingDevice.name}"...`);
         await deleteDevice(replacingDevice.id);
         setCommitStatus("Old manual deleted. Uploading new manual...");
-      } else {
-        setCommitStatus("Uploading manual and updating index...");
       }
 
-      const device = await commitManual({
-        token: result.token,
-        manual_filename: manualFilename,
+      const commitItems: BatchCommitItem[] = itemsReadyForUpload.map((item) => ({
+        token: item.token!,
+        manual_filename: item.outputFilename!,
         metadata: {
-          ...manualMetadata,
-          manual_files: [manualFilename],
+          ...item.metadata!,
+          manual_files: [item.outputFilename!],
         },
-      });
-      
-      if (replacingDevice) {
-        setCommitStatus(`[OK] Manual replaced successfully for "${device.name}"!`);
+      }));
+
+      setCommitStatus(`Uploading ${commitItems.length} manual(s)...`);
+
+      const result = await commitManualsBatch(commitItems);
+
+      if (result.errors.length > 0) {
+        setCommitStatus(
+          `[OK] Uploaded ${result.devices.length} manual(s). ${result.errors.length} error(s) occurred.`
+        );
       } else {
-        setCommitStatus(`[OK] Upload complete for device "${device.name}"!`);
+        setCommitStatus(`[OK] Successfully uploaded ${result.devices.length} manual(s)!`);
       }
-      
-      // Mark upload as complete to keep buttons disabled
+
       setIsUploadComplete(true);
-      
+
       // Refresh device list and close modal
       const updatedDevices = await getDevices();
       setTimeout(() => {
@@ -332,47 +410,72 @@ export function ManualOnboardingModal({
         onClose();
       }, 1500);
     } catch (err: unknown) {
-      setCommitStatus(`[ERROR] ${replacingDevice ? "Replace" : "Upload"} failed: ${getErrorMessage(err)}`);
+      setCommitStatus(`[ERROR] Upload failed: ${getErrorMessage(err)}`);
     } finally {
       setIsCommitting(false);
     }
   };
 
+  // Auto-analyze when selecting an item in verification step
+  useEffect(() => {
+    if (
+      currentStep === "verification" &&
+      selectedItem &&
+      selectedItem.status === "complete" &&
+      selectedItem.analyzeStatus === "pending"
+    ) {
+      handleAnalyzeItem(selectedItem.id);
+    }
+  }, [currentStep, selectedItemId]);
+
+  // Auto-select first complete item when entering verification step
+  useEffect(() => {
+    if (currentStep === "verification" && !selectedItemId) {
+      const firstComplete = batchItems.find((item) => item.status === "complete");
+      if (firstComplete) {
+        setSelectedItemId(firstComplete.id);
+      }
+    }
+  }, [currentStep, selectedItemId, batchItems]);
+
   const canGoNext = () => {
     switch (currentStep) {
       case "file-selection":
-        return manualFile !== null;
+        return batchItems.length > 0;
       case "processing":
-        return processResult !== null && !isProcessing;
-      case "analysis":
-        return analyzeResult !== null && !isAnalyzing;
+        return allProcessed && batchItems.some((item) => item.status === "complete");
+      case "verification":
+        return allVerified && itemsReadyForUpload.length > 0;
       case "upload":
-        return false; // No next step
+        return false;
       default:
         return false;
     }
   };
 
   const canGoPrevious = () => {
-    return currentStep !== "file-selection" && !isProcessing && !isAnalyzing && !isCommitting && !isUploadComplete;
+    return (
+      currentStep !== "file-selection" &&
+      !anyProcessing &&
+      !isCommitting &&
+      !isUploadComplete
+    );
   };
 
   const handleNext = () => {
-    if (currentStep === "file-selection" && manualFile) {
+    if (currentStep === "file-selection" && batchItems.length > 0) {
       setCurrentStep("processing");
-    } else if (currentStep === "processing" && processResult) {
-      setCurrentStep("analysis");
-      // Auto-start analysis when entering step 3
-      setTimeout(() => handleAnalyze(), 100);
-    } else if (currentStep === "analysis" && analyzeResult) {
+    } else if (currentStep === "processing" && allProcessed) {
+      setCurrentStep("verification");
+    } else if (currentStep === "verification" && allVerified) {
       setCurrentStep("upload");
     }
   };
 
   const handlePrevious = () => {
     if (currentStep === "processing") setCurrentStep("file-selection");
-    else if (currentStep === "analysis") setCurrentStep("processing");
-    else if (currentStep === "upload") setCurrentStep("analysis");
+    else if (currentStep === "verification") setCurrentStep("processing");
+    else if (currentStep === "upload") setCurrentStep("verification");
   };
 
   const renderStepContent = () => {
@@ -380,41 +483,56 @@ export function ManualOnboardingModal({
       case "file-selection":
         return (
           <div className="wizard-step">
-            <h3>Step 1: Select Manual File</h3>
+            <h3>Step 1: Select Manual Files</h3>
             <p className="step-description">
-              {replacingDevice 
+              {replacingDevice
                 ? `Choose a new PDF manual to replace the existing one for ${replacingDevice.name}.`
-                : 'Choose a PDF manual to add to your knowledge base.'}
+                : "Choose one or more PDF manuals to add to your knowledge base."}
             </p>
             <div className="file-input-wrapper">
               <input
+                ref={fileInputRef}
                 type="file"
                 accept=".pdf"
+                multiple={!replacingDevice}
                 id="manual-file-input"
-                onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
-                disabled={isProcessing}
+                onChange={(e) => handleFilesSelect(e.target.files)}
               />
               <label htmlFor="manual-file-input" className="file-label">
-                {manualFile ? (
-                  <>
-                    <span className="file-icon">[OK]</span>
-                    <span className="file-name">{manualFile.name}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="file-icon">[...]</span>
-                    <span>Choose PDF file</span>
-                  </>
-                )}
+                <span className="file-icon">[+]</span>
+                <span>
+                  {replacingDevice ? "Choose PDF file" : "Choose PDF file(s)"}
+                </span>
               </label>
             </div>
+
+            {batchItems.length > 0 && (
+              <div className="selected-files-list">
+                <h4>Selected Files ({batchItems.length})</h4>
+                <ul>
+                  {batchItems.map((item) => (
+                    <li key={item.id} className="selected-file-item">
+                      <span className="file-name">{item.file.name}</span>
+                      <button
+                        type="button"
+                        className="remove-file-btn"
+                        onClick={() => handleRemoveFile(item.id)}
+                        aria-label={`Remove ${item.file.name}`}
+                      >
+                        X
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         );
 
       case "processing":
         return (
           <div className="wizard-step">
-            <h3>Step 2: Process Manual</h3>
+            <h3>Step 2: Process Manuals</h3>
             <p className="step-description">
               Extract English content. Non-English manuals will be auto-translated.
             </p>
@@ -424,114 +542,206 @@ export function ManualOnboardingModal({
                   type="checkbox"
                   checked={isEnglishManual}
                   onChange={(e) => setIsEnglishManual(e.target.checked)}
-                  disabled={isProcessing}
+                  disabled={anyProcessing}
                 />
-                <span>English manual (skip language detection, process entire manual)</span>
+                <span>English manuals (skip language detection, process entire manual)</span>
               </label>
             </div>
             <div className="process-actions">
               <button
                 type="button"
-                onClick={handleProcess}
-                disabled={!manualFile || isProcessing}
+                onClick={handleStartProcessing}
+                disabled={batchItems.length === 0 || anyProcessing || allProcessed}
                 className="action-button"
               >
-                {isProcessing ? (
+                {anyProcessing ? (
                   <>
                     <span className="spinner"></span>
                     Processing...
                   </>
+                ) : allProcessed ? (
+                  "Processing Complete"
                 ) : (
                   "Start Processing"
                 )}
               </button>
-              {isProcessing && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (currentToken) {
-                      try {
-                        setProcessLog((prev) => [...prev, "[INFO] Cancellation requested..."]);
-                        await cancelProcessing(currentToken);
-                        // Keep polling - it will detect "cancelled" status and unlock UI
-                      } catch (err: unknown) {
-                        const errorMsg = getErrorMessage(err, "");
-                        
-                        // "Token not found" means processing already finished
-                        if (errorMsg.includes("Token not found")) {
-                          setProcessLog((prev) => [...prev, "[INFO] Processing already completed"]);
-                          // Keep polling to get final status
-                        } else {
-                          // Real error - backend crashed or unavailable
-                          setProcessLog((prev) => [...prev, `[ERROR] Cancel failed: ${errorMsg}`]);
-                          // Stop polling and unlock UI on real errors
-                          stopStatusPolling();
-                          setIsProcessing(false);
-                          setCurrentToken(null);
-                        }
-                      }
-                    }
-                  }}
-                  className="action-button cancel-processing"
-                >
-                  Cancel
-                </button>
-              )}
             </div>
-            <div ref={processLogRef} className="process-log">
-              {processLog.length > 0 ? (
-                processLog.map((line, idx) => (
-                  <div
-                    key={idx}
-                    className={`log-line ${idx === processLog.length - 1 ? "log-line-latest" : ""}`}
-                  >
-                    {line}
-                  </div>
-                ))
-              ) : (
-                <div className="log-placeholder">Processing results will appear here...</div>
-              )}
+
+            <div className="batch-progress-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>File</th>
+                    <th>Status</th>
+                    <th>Language</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batchItems.map((item) => (
+                    <tr
+                      key={item.id}
+                      className={`status-row status-${item.status}`}
+                      onClick={() => setSelectedItemId(item.id)}
+                    >
+                      <td className="file-name-cell">{item.file.name}</td>
+                      <td className="status-cell">
+                        {item.status === "pending" && <span className="status-badge pending">Pending</span>}
+                        {item.status === "processing" && (
+                          <span className="status-badge processing">
+                            <span className="spinner-small"></span> Processing
+                          </span>
+                        )}
+                        {item.status === "complete" && <span className="status-badge complete">Complete</span>}
+                        {item.status === "error" && <span className="status-badge error">Error</span>}
+                        {item.status === "cancelled" && <span className="status-badge cancelled">Cancelled</span>}
+                      </td>
+                      <td className="language-cell">
+                        {item.detectedLanguage || "—"}
+                        {item.translated && " (translated)"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+
+            {selectedItem && (
+              <div ref={processLogRef} className="process-log">
+                <div className="log-header">Logs: {selectedItem.file.name}</div>
+                {selectedItem.logs.length > 0 ? (
+                  selectedItem.logs.map((line, idx) => (
+                    <div
+                      key={idx}
+                      className={`log-line ${idx === selectedItem.logs.length - 1 ? "log-line-latest" : ""}`}
+                    >
+                      {line}
+                    </div>
+                  ))
+                ) : (
+                  <div className="log-placeholder">Processing logs will appear here...</div>
+                )}
+              </div>
+            )}
           </div>
         );
 
-      case "analysis":
+      case "verification":
         return (
-          <div className="wizard-step">
-            <h3>Step 3: AI Analysis</h3>
+          <div className="wizard-step verification-step">
+            <h3>Step 3: Verify Metadata</h3>
             <p className="step-description">
-              Let AI extract device metadata from the manual.
+              Review each manual with the original PDF. Click on a manual to verify its metadata.
             </p>
-            <div className="metadata-grid">
-              {(
-                ["id", "name", "brand", "model", "room", "category"] as Array<
-                  "id" | "name" | "brand" | "model" | "room" | "category"
-                >
-              ).map((field) => (
-                <label key={field}>
-                  {field.toUpperCase()}
-                  <input
-                    type="text"
-                    value={manualMetadata[field] ?? ""}
-                    onChange={(e) =>
-                      setManualMetadata((prev) => ({
-                        ...prev,
-                        [field]: e.target.value,
-                      }))
-                    }
-                  />
-                </label>
-              ))}
+            <div className="verification-layout">
+              {/* Manual list sidebar */}
+              <div className="verification-sidebar">
+                <h4>Manuals</h4>
+                <ul className="verification-list">
+                  {batchItems
+                    .filter((item) => item.status === "complete")
+                    .map((item) => (
+                      <li
+                        key={item.id}
+                        className={`verification-list-item ${selectedItemId === item.id ? "selected" : ""} ${item.isVerified ? "verified" : ""}`}
+                        onClick={() => setSelectedItemId(item.id)}
+                      >
+                        <span className="verify-indicator">
+                          {item.isVerified ? "[OK]" : "[ ]"}
+                        </span>
+                        <span className="item-name" title={item.file.name}>
+                          {item.file.name.length > 25
+                            ? item.file.name.slice(0, 22) + "..."
+                            : item.file.name}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+                <div className="verification-progress">
+                  {itemsReadyForUpload.length} / {batchItems.filter((i) => i.status === "complete").length} verified
+                </div>
+              </div>
+
+              {/* Main content area */}
+              <div className="verification-main">
+                {selectedItem && selectedItem.status === "complete" ? (
+                  <>
+                    {/* PDF Viewer */}
+                    <div className="verification-pdf">
+                      <PdfViewer
+                        file={selectedItem.token ? getManualPdfUrl(selectedItem.token) : null}
+                        maxHeight="350px"
+                      />
+                    </div>
+
+                    {/* Metadata Form */}
+                    <div className="verification-form">
+                      {selectedItem.analyzeStatus === "analyzing" ? (
+                        <div className="analyzing-status">
+                          <span className="spinner"></span>
+                          <span>Analyzing manual with AI...</span>
+                        </div>
+                      ) : selectedItem.analyzeStatus === "error" ? (
+                        <div className="analyze-error">
+                          <p>Analysis failed: {selectedItem.analyzeError}</p>
+                          <button
+                            type="button"
+                            onClick={() => handleAnalyzeItem(selectedItem.id)}
+                            className="action-button small"
+                          >
+                            Retry Analysis
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="metadata-grid">
+                            {(["id", "name", "brand", "model", "room", "category"] as const).map(
+                              (field) => (
+                                <label key={field}>
+                                  {field.toUpperCase()}
+                                  {(field === "id" || field === "name") && (
+                                    <span className="required">*</span>
+                                  )}
+                                  <input
+                                    type="text"
+                                    value={selectedItem.metadata?.[field] ?? ""}
+                                    onChange={(e) =>
+                                      handleUpdateMetadata(selectedItem.id, field, e.target.value)
+                                    }
+                                    disabled={selectedItem.isVerified}
+                                  />
+                                </label>
+                              )
+                            )}
+                          </div>
+                          <div className="verification-actions">
+                            {!selectedItem.isVerified ? (
+                              <button
+                                type="button"
+                                onClick={() => handleVerifyItem(selectedItem.id)}
+                                disabled={
+                                  !selectedItem.metadata?.id || !selectedItem.metadata?.name
+                                }
+                                className="action-button primary"
+                              >
+                                Mark as Verified
+                              </button>
+                            ) : (
+                              <div className="verified-badge">
+                                <span>[OK]</span> Verified
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="no-selection">
+                    <p>Select a manual from the list to verify its metadata.</p>
+                  </div>
+                )}
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={handleAnalyze}
-              disabled={!processResult || isAnalyzing}
-              className="action-button"
-            >
-              {isAnalyzing ? "Analyzing..." : "Analyze with AI"}
-            </button>
-            {analyzeStatus && <p className="status-message">{analyzeStatus}</p>}
           </div>
         );
 
@@ -540,29 +750,24 @@ export function ManualOnboardingModal({
           <div className="wizard-step">
             <h3>Step 4: Upload to Knowledge Base</h3>
             <p className="step-description">
-              Review the metadata and upload the manual to your knowledge base.
+              Review and upload all verified manuals to your knowledge base.
             </p>
-            <div className="metadata-review">
-              <div className="review-item">
-                <span className="review-label">Device:</span>
-                <span className="review-value">{manualMetadata.name || "—"}</span>
-              </div>
-              <div className="review-item">
-                <span className="review-label">Brand:</span>
-                <span className="review-value">{manualMetadata.brand || "—"}</span>
-              </div>
-              <div className="review-item">
-                <span className="review-label">Model:</span>
-                <span className="review-value">{manualMetadata.model || "—"}</span>
-              </div>
-              <div className="review-item">
-                <span className="review-label">Room:</span>
-                <span className="review-value">{manualMetadata.room || "—"}</span>
-              </div>
-              <div className="review-item">
-                <span className="review-label">Category:</span>
-                <span className="review-value">{manualMetadata.category || "—"}</span>
-              </div>
+            <div className="upload-review">
+              <h4>Ready to Upload ({itemsReadyForUpload.length})</h4>
+              <ul className="upload-list">
+                {itemsReadyForUpload.map((item) => (
+                  <li key={item.id} className="upload-list-item">
+                    <div className="upload-item-info">
+                      <span className="device-name">{item.metadata?.name || item.file.name}</span>
+                      <span className="device-details">
+                        {[item.metadata?.brand, item.metadata?.model, item.metadata?.room]
+                          .filter(Boolean)
+                          .join(" | ") || "No additional details"}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
             {commitStatus && <p className="status-message">{commitStatus}</p>}
           </div>
@@ -570,7 +775,7 @@ export function ManualOnboardingModal({
     }
   };
 
-  const steps: WizardStep[] = ["file-selection", "processing", "analysis", "upload"];
+  const steps: WizardStep[] = ["file-selection", "processing", "verification", "upload"];
   const currentStepIndex = steps.indexOf(currentStep);
 
   return (
@@ -580,18 +785,15 @@ export function ManualOnboardingModal({
         <div className="modal-overlay" style={{ zIndex: 1100 }}>
           <div className="confirm-popup">
             <h3>Cancel Manual Upload?</h3>
-            <p>All progress will be lost and any uploaded files will be deleted. This cannot be undone.</p>
+            <p>
+              All progress will be lost and any uploaded files will be deleted. This cannot be
+              undone.
+            </p>
             <div className="confirm-actions">
-              <button
-                onClick={() => setShowCancelConfirm(false)}
-                className="confirm-button secondary"
-              >
+              <button onClick={() => setShowCancelConfirm(false)} className="confirm-button secondary">
                 Keep Working
               </button>
-              <button
-                onClick={handleCancelWizard}
-                className="confirm-button danger"
-              >
+              <button onClick={handleCancelWizard} className="confirm-button danger">
                 Yes, Cancel
               </button>
             </div>
@@ -600,81 +802,92 @@ export function ManualOnboardingModal({
       )}
 
       <div className="modal-overlay" onClick={handleClose}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div
+          className={`modal-content ${currentStep === "verification" ? "modal-wide" : ""}`}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="modal-header">
-            <h2>{replacingDevice ? `Replace Manual - ${replacingDevice.name}` : 'Manual Onboarding'}</h2>
-            <button className="close-button" onClick={handleClose} disabled={isProcessing || isAnalyzing || isCommitting || isUploadComplete} aria-label="Close">
+            <h2>
+              {replacingDevice
+                ? `Replace Manual - ${replacingDevice.name}`
+                : batchItems.length > 1
+                  ? `Batch Manual Onboarding (${batchItems.length} files)`
+                  : "Manual Onboarding"}
+            </h2>
+            <button
+              className="close-button"
+              onClick={handleClose}
+              disabled={anyProcessing || isCommitting || isUploadComplete}
+              aria-label="Close"
+            >
               X
             </button>
           </div>
 
-        <div className="wizard-progress">
-          {steps.map((step, idx) => (
-            <div
-              key={step}
-              className={`progress-step ${idx <= currentStepIndex ? "active" : ""} ${
-                idx === currentStepIndex ? "current" : ""
-              }`}
-            >
-              <div className="progress-circle">{idx + 1}</div>
-              <div className="progress-label">
-                {step === "file-selection" && "Select"}
-                {step === "processing" && "Process"}
-                {step === "analysis" && "Analyze"}
-                {step === "upload" && "Upload"}
+          <div className="wizard-progress">
+            {steps.map((step, idx) => (
+              <div
+                key={step}
+                className={`progress-step ${idx <= currentStepIndex ? "active" : ""} ${idx === currentStepIndex ? "current" : ""}`}
+              >
+                <div className="progress-circle">{idx + 1}</div>
+                <div className="progress-label">
+                  {step === "file-selection" && "Select"}
+                  {step === "processing" && "Process"}
+                  {step === "verification" && "Verify"}
+                  {step === "upload" && "Upload"}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="wizard-content">{renderStepContent()}</div>
-
-        <div className="modal-footer">
-          <div className="footer-left">
-            {currentStep !== "file-selection" && (
-              <button
-                onClick={handlePrevious}
-                disabled={!canGoPrevious()}
-                className="footer-button secondary"
-              >
-                ← Previous
-              </button>
-            )}
+            ))}
           </div>
-          <div className="footer-right">
-            <button
-              onClick={handleClose}
-              className="footer-button cancel-wizard"
-              disabled={isUploadComplete}
-            >
-              Cancel
-            </button>
-            {currentStep !== "upload" ? (
+
+          <div className="wizard-content">{renderStepContent()}</div>
+
+          <div className="modal-footer">
+            <div className="footer-left">
+              {currentStep !== "file-selection" && (
+                <button
+                  onClick={handlePrevious}
+                  disabled={!canGoPrevious()}
+                  className="footer-button secondary"
+                >
+                  ← Previous
+                </button>
+              )}
+            </div>
+            <div className="footer-right">
               <button
-                onClick={handleNext}
-                disabled={!canGoNext()}
-                className="footer-button primary"
+                onClick={handleClose}
+                className="footer-button cancel-wizard"
+                disabled={isUploadComplete}
               >
-                Next →
+                Cancel
               </button>
-            ) : (
-              <button
-                onClick={handleCommit}
-                disabled={isCommitting || isUploadComplete || !manualMetadata.id || !manualMetadata.name}
-                className="footer-button primary"
-              >
-                {isCommitting 
-                  ? (replacingDevice ? "Replacing..." : "Uploading...") 
-                  : isUploadComplete
-                  ? "✓ Complete"
-                  : (replacingDevice ? "Replace Manual" : "Upload Manual")}
-              </button>
-            )}
+              {currentStep !== "upload" ? (
+                <button
+                  onClick={handleNext}
+                  disabled={!canGoNext()}
+                  className="footer-button primary"
+                >
+                  Next →
+                </button>
+              ) : (
+                <button
+                  onClick={handleCommitBatch}
+                  disabled={isCommitting || isUploadComplete || itemsReadyForUpload.length === 0}
+                  className="footer-button primary"
+                >
+                  {isCommitting
+                    ? "Uploading..."
+                    : isUploadComplete
+                      ? "Complete"
+                      : `Upload ${itemsReadyForUpload.length} Manual(s)`}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
     </>
   );
 }
-

@@ -869,6 +869,127 @@ def commit_manual(request: ManualCommitRequest) -> ManualCommitResponse:
     return ManualCommitResponse(device=device_model)
 
 
+@app.get("/manuals/{token}/pdf")
+def get_manual_pdf(token: str):
+    """Serve the original PDF file for preview during batch upload verification."""
+    try:
+        temp_meta = manual_processing.load_meta(token)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    
+    pdf_filename = temp_meta.get("stored_filename")
+    if not pdf_filename:
+        raise HTTPException(status_code=404, detail="No PDF file found for token")
+    
+    try:
+        pdf_path = manual_processing.get_temp_file_path(token, pdf_filename)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=pdf_filename,
+    )
+
+
+class BatchCommitItem(BaseModel):
+    token: str
+    metadata: ManualMetadata
+    manual_filename: str
+
+
+class BatchCommitRequest(BaseModel):
+    items: List[BatchCommitItem]
+
+
+class BatchCommitResponse(BaseModel):
+    devices: List[Device]
+    errors: List[dict] = []
+
+
+@app.post("/manuals/commit/batch", response_model=BatchCommitResponse)
+def commit_manuals_batch(request: BatchCommitRequest) -> BatchCommitResponse:
+    """Batch commit multiple manuals to the knowledge base."""
+    committed_devices: List[Device] = []
+    errors: List[dict] = []
+    
+    for item in request.items:
+        try:
+            # Load temp metadata
+            try:
+                temp_meta = manual_processing.load_meta(item.token)
+            except FileNotFoundError as exc:
+                errors.append({"token": item.token, "error": str(exc)})
+                continue
+            
+            manual_filename = item.manual_filename
+            try:
+                source_path = manual_processing.get_temp_file_path(item.token, manual_filename)
+            except FileNotFoundError as exc:
+                errors.append({"token": item.token, "error": str(exc)})
+                continue
+            
+            # Create target directory
+            target_dir = settings.MANUALS_DIR / item.metadata.id
+            target_dir.mkdir(parents=True, exist_ok=True)
+            destination_path = target_dir / manual_filename
+            
+            # Move manual file
+            shutil.move(source_path, destination_path)
+            
+            # Move images directory if exists
+            images_dir = source_path.parent / "images"
+            if images_dir.exists() and images_dir.is_dir():
+                target_images_dir = target_dir / "images"
+                if target_images_dir.exists():
+                    shutil.rmtree(target_images_dir, ignore_errors=True)
+                shutil.move(str(images_dir), str(target_images_dir))
+            
+            # Also move the original PDF for reference
+            original_pdf = temp_meta.get("stored_filename")
+            if original_pdf and original_pdf != manual_filename:
+                original_pdf_path = source_path.parent / original_pdf
+                if original_pdf_path.exists():
+                    shutil.move(str(original_pdf_path), str(target_dir / original_pdf))
+            
+            # Update devices catalog
+            devices = load_devices()
+            existing = next((d for d in devices if d.id == item.metadata.id), None)
+            
+            updated_manual_files = set(existing.manual_files if existing else [])
+            updated_manual_files.add(manual_filename)
+            
+            device_data = item.metadata.model_dump()
+            device_data["manual_files"] = sorted(updated_manual_files)
+            device_model = Device(**device_data)
+            
+            if existing:
+                devices = [device_model if d.id == device_model.id else d for d in devices]
+            else:
+                devices.append(device_model)
+            
+            save_devices(devices)
+            
+            # Add to vector store
+            try:
+                add_device_manuals(device_model.id)
+            except Exception as exc:
+                logger.warning("Failed to add to vector store for %s: %s", item.token, exc)
+                errors.append({"token": item.token, "error": f"Vector store error: {exc}"})
+            
+            committed_devices.append(device_model)
+            
+            # Cleanup temp files
+            manual_processing.cleanup_token(item.token)
+            
+        except Exception as exc:
+            logger.error("Failed to commit manual %s: %s", item.token, exc)
+            errors.append({"token": item.token, "error": str(exc)})
+    
+    return BatchCommitResponse(devices=committed_devices, errors=errors)
+
+
 @app.delete("/devices/{device_id}")
 def delete_device(device_id: str) -> dict:
     """Delete a device and all its manuals from the system."""

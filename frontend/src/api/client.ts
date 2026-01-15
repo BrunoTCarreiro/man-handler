@@ -209,6 +209,36 @@ export async function commitManual(payload: ManualCommitPayload): Promise<Device
   return data.device;
 }
 
+export type BatchCommitItem = {
+  token: string;
+  manual_filename: string;
+  metadata: ManualMetadata;
+};
+
+export type BatchCommitResponse = {
+  devices: Device[];
+  errors: { token: string; error: string }[];
+};
+
+export async function commitManualsBatch(items: BatchCommitItem[]): Promise<BatchCommitResponse> {
+  const res = await fetch(apiUrl("/manuals/commit/batch"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Batch upload failed: ${text || res.status}`);
+  }
+
+  return res.json();
+}
+
+export function getManualPdfUrl(token: string): string {
+  return apiUrl(`/manuals/${token}/pdf`);
+}
+
 export async function deleteDevice(deviceId: string): Promise<void> {
   const res = await fetch(apiUrl(`/devices/${deviceId}`), {
     method: "DELETE",
