@@ -18,7 +18,7 @@ from . import manual_processing, settings
 from .device_catalog import Device, get_device, list_rooms, load_devices, save_devices
 from .ingest import add_device_manuals, remove_device_from_vectorstore, replace_device_manuals
 from .rag_pipeline import answer_question, clear_session_memory, reload_vectorstore
-from .ocr_extraction import extract_pdf_with_ocr, clean_grounding_tags
+from .ocr_extraction import extract_pdf_with_ocr
 from extract_manual import generate_reference_md
 from .translation import detect_language
 from .language_detection import detect_and_select_language_section, get_language_name
@@ -145,21 +145,18 @@ class UpdateModelsRequest(BaseModel):
     llm_model: Optional[str] = None
     embedding_model: Optional[str] = None
     translation_model: Optional[str] = None
-    analysis_model: Optional[str] = None
 
 
 class CompleteSetupRequest(BaseModel):
     llm_model: str
     embedding_model: str
     translation_model: Optional[str] = None
-    analysis_model: Optional[str] = None
 
 
 class UpdateConfigRequest(BaseModel):
     llm_model: Optional[str] = None
     embedding_model: Optional[str] = None
     translation_model: Optional[str] = None
-    analysis_model: Optional[str] = None
     top_k: Optional[int] = None
     chunk_size: Optional[int] = None
     chunk_overlap: Optional[int] = None
@@ -206,7 +203,6 @@ def get_setup_status() -> SetupStatusResponse:
             "llm_model": config.get_llm_model(),
             "embedding_model": config.get_embedding_model(),
             "translation_model": config.get_translation_model(),
-            "analysis_model": config.get_analysis_model(),
         },
     )
 
@@ -277,13 +273,13 @@ async def test_ocr(file: UploadFile = File(...)) -> dict:
         image_bytes = await file.read()
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
         
-        # Run OCR using the same prompt as describe_image_with_ocr()
+        # Run OCR using the actual model
         response = ollama.chat(
             model="deepseek-ocr:3b",
             messages=[
                 {
                     "role": "user",
-                    "content": "<|grounding|>Describe what this image shows and extract any visible text.",
+                    "content": "<|grounding|>Convert the document to markdown.",
                     "images": [image_b64],
                 }
             ],
@@ -292,16 +288,13 @@ async def test_ocr(file: UploadFile = File(...)) -> dict:
             },
         )
         
-        raw_text = response["message"]["content"]
-        # Clean grounding tags from output for display
-        extracted_text = clean_grounding_tags(raw_text)
+        extracted_text = response["message"]["content"]
         
         return {
             "status": "success",
             "input": f"Image: {file.filename}",
             "output": extracted_text[:500] + ("..." if len(extracted_text) > 500 else ""),
             "full_output": extracted_text,
-            "raw_output": raw_text,  # Include raw for debugging
         }
     except Exception as e:
         logger.error("OCR test failed: %s", e)
@@ -340,7 +333,6 @@ def complete_setup(request: CompleteSetupRequest) -> dict:
         llm=request.llm_model,
         embedding=request.embedding_model,
         translation=request.translation_model or request.llm_model,
-        analysis=request.analysis_model or request.llm_model,
     )
     
     # Mark setup as completed
@@ -360,7 +352,6 @@ def complete_setup(request: CompleteSetupRequest) -> dict:
             "llm_model": config.get_llm_model(),
             "embedding_model": config.get_embedding_model(),
             "translation_model": config.get_translation_model(),
-            "analysis_model": config.get_analysis_model(),
         },
     }
 
@@ -384,7 +375,7 @@ def update_setup_config(request: UpdateConfigRequest) -> dict:
     embedding_changed = False
     
     # Update models if provided
-    if request.llm_model or request.embedding_model or request.translation_model or request.analysis_model:
+    if request.llm_model or request.embedding_model or request.translation_model:
         if request.embedding_model:
             embedding_changed = True
         
@@ -392,14 +383,12 @@ def update_setup_config(request: UpdateConfigRequest) -> dict:
             llm=request.llm_model,
             embedding=request.embedding_model,
             translation=request.translation_model,
-            analysis=request.analysis_model,
         )
         logger.info(
-            "Updated models: LLM=%s, Embedding=%s, Translation=%s, Analysis=%s",
+            "Updated models: LLM=%s, Embedding=%s, Translation=%s",
             request.llm_model or "unchanged",
             request.embedding_model or "unchanged",
             request.translation_model or "unchanged",
-            request.analysis_model or "unchanged",
         )
     
     # Reload vectorstore if embedding model changed

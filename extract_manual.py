@@ -15,7 +15,6 @@ Outputs:
 import argparse
 from pathlib import Path
 from datetime import datetime
-from typing import Callable
 
 from backend.ocr_extraction import extract_pdf_with_ocr
 from backend.translation import (
@@ -48,15 +47,8 @@ def generate_debug_md(results: list, pdf_path: Path, output_path: Path):
             
             if r['image_files']:
                 f.write(f"**Images on this page:** {len(r['image_files'])}\n\n")
-                for img_info in r['image_files']:
-                    # Handle both old format (string) and new format (dict)
-                    if isinstance(img_info, dict):
-                        img_file = img_info.get("filename", "unknown")
-                        description = img_info.get("description", "No description")
-                        f.write(f"- `{img_file}`: {description}\n")
-                    else:
-                        # Backward compatibility
-                        f.write(f"- `{img_info}`\n")
+                for img_file in r['image_files']:
+                    f.write(f"- `{img_file}`\n")
                 f.write('\n')
             
             f.write("---\n\n")
@@ -72,7 +64,7 @@ def generate_reference_md(
     translate: bool = True,
     skip_index_pages: int = 0,
     translation_model: str | None = None,
-    progress_callback: Callable[[str], None] | None = None,
+    progress_callback: callable | None = None,
 ):
     """Generate user reference markdown with inline images.
     
@@ -144,20 +136,13 @@ def generate_reference_md(
 
         body_chunks.append(text)
 
-        # Insert images inline with descriptive alt text
+        # Insert images inline (generic labels for now)
         if r["image_files"]:
-            for img_idx, img_info in enumerate(r["image_files"], 1):
-                # Handle both old format (string) and new format (dict with filename/description)
-                if isinstance(img_info, dict):
-                    img_file = img_info.get("filename", "")
-                    alt_text = img_info.get("description", f"Figure {img_idx}")
-                else:
-                    # Backward compatibility: old format was just filename string
-                    img_file = img_info
-                    alt_text = f"Figure {img_idx}"
-                
+            for img_idx, img_file in enumerate(r["image_files"], 1):
+                # TODO: Use vision model for meaningful descriptions
+                figure_num = sum(len(res["image_files"]) for res in results[: idx - 1]) + img_idx
                 rel_img_path = (images_rel_path / img_file).as_posix()
-                body_chunks.append(f"![{alt_text}]({rel_img_path})")
+                body_chunks.append(f"![Figure {figure_num}]({rel_img_path})")
 
     # Join all chunks and run second-pass cleanup:
     # - Strip leftover ```markdown fences

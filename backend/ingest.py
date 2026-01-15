@@ -97,15 +97,6 @@ def _load_manual_files_for_device(device: Device):
             
             # Convert OCR results to Document objects
             for page_data in ocr_results:
-                # Handle both old format (list of strings) and new format (list of dicts)
-                image_files = page_data["image_files"]
-                if image_files and isinstance(image_files[0], dict):
-                    # New format: extract filenames from dicts
-                    image_filenames = [img.get("filename", "") for img in image_files]
-                else:
-                    # Old format: already a list of strings
-                    image_filenames = image_files
-                
                 doc = Document(
                     page_content=page_data["text"],
                     metadata={
@@ -117,8 +108,8 @@ def _load_manual_files_for_device(device: Device):
                         "category": device.category,
                         "file_name": path.name,
                         "page": page_data["page_num"] + 1,  # 1-indexed for display
-                        "has_images": len(image_files) > 0,
-                        "image_files": ",".join(image_filenames) if image_filenames else "",
+                        "has_images": len(page_data["image_files"]) > 0,
+                        "image_files": ",".join(page_data["image_files"]) if page_data["image_files"] else "",
                         "source_type": "pdf_ocr",
                     }
                 )

@@ -197,62 +197,6 @@ def extract_image_region(page_image_path: Path, coords: List[int], output_path: 
         return False
 
 
-def describe_image_with_ocr(image_path: Path) -> str:
-    """Generate a brief description of an image using DeepSeek-OCR.
-
-    Uses the OCR model to describe technical diagrams, icons, and figures
-    for use as alt text in the generated markdown.
-
-    Args:
-        image_path: Path to the image file to describe
-
-    Returns:
-        A brief description string, or a generic fallback if description fails.
-    """
-    try:
-        # Read and encode image as base64
-        with image_path.open("rb") as img_file:
-            image_data = base64.b64encode(img_file.read()).decode("utf-8")
-
-        # Use grounding prompt - what DeepSeek-OCR is trained for
-        response = ollama.chat(
-            model="deepseek-ocr:3b",
-            messages=[
-                {
-                    "role": "user",
-                    "content": "<|grounding|>Describe what this image shows and extract any visible text.",
-                    "images": [image_data],
-                }
-            ],
-            options={
-                "temperature": 0.1,
-            },
-        )
-
-        description = response["message"]["content"].strip()
-
-        # Clean grounding tags from the output (coordinates, ref tags, etc.)
-        description = clean_grounding_tags(description)
-
-        # Clean up the description - remove quotes if the model wrapped it
-        if description.startswith('"') and description.endswith('"'):
-            description = description[1:-1]
-        if description.startswith("'") and description.endswith("'"):
-            description = description[1:-1]
-
-        # Ensure description isn't excessively long (truncate if needed)
-        # Allow longer descriptions for detailed manual images
-        if len(description) > 500:
-            description = description[:497] + "..."
-
-        # Return description or fallback if empty
-        return description if description else "Figure"
-
-    except Exception as e:
-        logger.warning("Failed to generate image description: %s", e)
-        return "Figure"
-
-
 def clean_grounding_tags(text: str) -> str:
     """Remove grounding tags from markdown text before storage.
 
@@ -335,7 +279,7 @@ def extract_page_with_ocr(
         {
             'text': str,              # Clean markdown text
             'page_num': int,          # Page number (0-indexed)
-            'image_files': List[Dict] # List of image info dicts with 'filename' and 'description'
+            'image_files': List[str]  # List of saved image filenames (relative)
         }
         or None if extraction fails.
     """
@@ -360,23 +304,13 @@ def extract_page_with_ocr(
         # Parse grounding output to find images
         image_elements = parse_grounding_output(raw_output, scale_x, scale_y)
 
-        # Extract image regions and generate descriptions
-        image_info_list: List[Dict] = []
+        # Extract image regions
+        image_filenames: List[str] = []
         for elem in image_elements:
             img_filename = f"page_{page_num+1:03d}_image_{elem['index']}.png"
             img_output_path = images_dir / img_filename
             if extract_image_region(page_image_path, elem["coords"], img_output_path):
-                # Generate description for the extracted image
-                description = describe_image_with_ocr(img_output_path)
-                logger.debug(
-                    "Image %s description: %s",
-                    img_filename,
-                    description[:50] + "..." if len(description) > 50 else description
-                )
-                image_info_list.append({
-                    "filename": img_filename,
-                    "description": description,
-                })
+                image_filenames.append(img_filename)
 
         # Clean grounding tags from text
         clean_text = clean_grounding_tags(raw_output)
@@ -384,7 +318,7 @@ def extract_page_with_ocr(
         return {
             "text": clean_text,
             "page_num": page_num,
-            "image_files": image_info_list,
+            "image_files": image_filenames,
         }
     
     finally:
